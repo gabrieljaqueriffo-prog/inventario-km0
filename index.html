@@ -631,6 +631,12 @@ function renderReporte(){
       <button class="btn btn-secondary btn-block no-print" id="btnCopiar">📋 Copiar reporte para WhatsApp</button>
       <button class="btn btn-primary btn-block no-print" id="btnPdf">🖨️ Guardar como PDF</button>
       <div id="copiarMsg" class="confirm-flash" style="display:none;">✓ Reporte copiado al portapapeles</div>
+
+      <div class="section-title">Respaldo de datos</div>
+      <button class="btn btn-secondary btn-block no-print" id="btnExportar">⬇️ Exportar datos (JSON)</button>
+      <button class="btn btn-secondary btn-block no-print" id="btnImportar">⬆️ Importar datos (JSON)</button>
+      <input type="file" id="inputImportar" accept="application/json,.json" style="display:none;">
+      <div id="importarMsg" class="confirm-flash" style="display:none;"></div>
     </div>
   `;
 
@@ -649,6 +655,47 @@ function renderReporte(){
     msg.style.display = "block";
     setTimeout(()=>{ msg.style.display = "none"; }, 2000);
   });
+
+  document.getElementById("btnExportar").addEventListener("click", exportarDatos);
+
+  const inputImportar = document.getElementById("inputImportar");
+  document.getElementById("btnImportar").addEventListener("click", ()=> inputImportar.click());
+  inputImportar.addEventListener("change", (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev)=>{
+      const msgEl = document.getElementById("importarMsg");
+      try{
+        const data = JSON.parse(ev.target.result);
+        if(!data || typeof data.registros !== "object") throw new Error("formato inválido");
+        estado = data;
+        guardarEstado();
+        msgEl.textContent = "✓ Datos importados correctamente";
+        msgEl.style.display = "block";
+        renderReporte();
+      }catch(err){
+        msgEl.textContent = "✗ El archivo no tiene un formato válido";
+        msgEl.style.color = "var(--rojo-pend)";
+        msgEl.style.display = "block";
+      }
+    };
+    reader.readAsText(file);
+    inputImportar.value = "";
+  });
+}
+
+function exportarDatos(){
+  const fecha = new Date().toISOString().slice(0,10);
+  const blob = new Blob([JSON.stringify(estado, null, 2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `km0_recepcion_${fecha}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 function generarTextoWhatsApp(completos, parciales, pendientes, total, faltantes, incompletos){
