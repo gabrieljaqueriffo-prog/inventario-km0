@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>KM0 — Recepción de Inventario</title>
+<style>
+  :root{
+    --rojo:#ed1c24;
+    --rojo-oscuro:#7a1315;
+    --gris:#58585b;
+    --blanco:#ffffff;
+    --verde:#22c55e;
+    --amarillo:#f59e0b;
+    --rojo-pend:#ef4444;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:#f4f4f5;
+    color:var(--gris);
+    -webkit-tap-highlight-color:transparent;
+  }
+  #app{max-width:480px;margin:0 auto;min-height:100vh;background:var(--blanco);position:relative;padding-bottom:24px;}
+
+  header.topbar{
+    position:sticky;top:0;z-index:50;
+    background:var(--rojo);color:var(--blanco);
+    padding:12px 14px;
+    display:flex;align-items:center;gap:10px;
+    box-shadow:0 2px 6px rgba(0,0,0,.15);
+  }
+  header.topbar button.back{
+    background:rgba(255,255,255,.15);
+    border:none;color:var(--blanco);
+    width:40px;height:40px;border-radius:8px;
+    font-size:20px;display:flex;align-items:center;justify-content:center;
+    flex-shrink:0;
+  }
+  header.topbar h1{font-size:16px;margin:0;font-weight:700;line-height:1.2;}
+  header.topbar .sub{font-size:11px;opacity:.85;margin:0;}
+
+  .container{padding:14px;}
+
+  .progress-wrap{margin-bottom:14px;}
+  .progress-bar-bg{
+    width:100%;height:14px;background:#e5e5e7;border-radius:8px;overflow:hidden;
+  }
+  .progress-bar-fill{
+    height:100%;background:linear-gradient(90deg,var(--rojo),var(--rojo-oscuro));
+    border-radius:8px;transition:width .4s ease;
+  }
+  .progress-label{font-size:13px;margin:6px 0;font-weight:600;color:var(--gris);}
+
+  .cards-row{display:flex;gap:8px;margin-bottom:14px;}
+  .stat-card{
+    flex:1;border-radius:8px;padding:10px 6px;text-align:center;
+    box-shadow:0 1px 4px rgba(0,0,0,.08);
+  }
+  .stat-card .num{font-size:20px;font-weight:800;}
+  .stat-card .lbl{font-size:10.5px;font-weight:600;margin-top:2px;}
+  .stat-card.completos{background:#ecfdf3;color:#15803d;}
+  .stat-card.parciales{background:#fffbeb;color:#b45309;}
+  .stat-card.pendientes{background:#fef2f2;color:#b91c1c;}
+
+  input[type="text"], input[type="number"], input[inputmode="numeric"]{
+    width:100%;height:48px;border-radius:8px;border:1px solid #d4d4d8;
+    padding:0 12px;font-size:16px;background:var(--blanco);color:var(--gris);
+  }
+  input:focus{outline:none;border-color:var(--rojo);}
+
+  .search-box{margin-bottom:12px;}
+
+  .filters{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;}
+  .filter-btn{
+    flex:1;min-height:40px;border-radius:8px;border:1px solid #d4d4d8;
+    background:var(--blanco);color:var(--gris);font-size:12.5px;font-weight:600;
+    white-space:nowrap;padding:0 8px;
+  }
+  .filter-btn.active{background:var(--rojo);color:var(--blanco);border-color:var(--rojo);}
+
+  .product-list{display:flex;flex-direction:column;gap:8px;}
+  .product-item{
+    border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.08);
+    padding:10px 12px;display:flex;align-items:center;gap:10px;
+    background:var(--blanco);border-left:5px solid #ccc;
+  }
+  .product-item.completo{border-left-color:var(--verde);}
+  .product-item.parcial{border-left-color:var(--amarillo);}
+  .product-item.pendiente{border-left-color:var(--rojo-pend);}
+  .product-item .info{flex:1;min-width:0;}
+  .product-item .codigo{font-weight:700;font-size:13px;color:var(--rojo-oscuro);}
+  .product-item .desc{font-size:12px;color:var(--gris);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .product-item .meta{font-size:11px;color:#888;margin-top:2px;}
+  .chip{
+    font-size:10.5px;font-weight:700;color:var(--blanco);
+    padding:4px 8px;border-radius:20px;flex-shrink:0;white-space:nowrap;
+  }
+  .chip.completo{background:var(--verde);}
+  .chip.parcial{background:var(--amarillo);}
+  .chip.pendiente{background:var(--rojo-pend);}
+
+  .btn{
+    min-height:48px;border-radius:8px;border:none;font-size:15px;font-weight:700;
+    cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;
+  }
+  .btn-primary{background:var(--rojo);color:var(--blanco);width:100%;}
+  .btn-primary:active{background:var(--rojo-oscuro);}
+  .btn-secondary{background:#f4f4f5;color:var(--gris);width:100%;border:1px solid #d4d4d8;}
+  .btn-block{width:100%;margin-top:10px;}
+
+  .detail-header-card{
+    background:var(--blanco);border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.08);
+    padding:14px;margin-bottom:14px;
+  }
+  .detail-header-card h2{font-size:17px;margin:0 0 4px;color:var(--gris);}
+  .detail-header-card .codigo-big{font-size:14px;font-weight:700;color:var(--rojo);margin-bottom:6px;}
+  .detail-header-card .marca-cat{font-size:12px;color:#888;margin-bottom:10px;}
+  .recibido-line{font-size:14px;font-weight:700;margin-bottom:6px;}
+  .estado-chip-big{
+    display:inline-block;padding:6px 14px;border-radius:20px;color:var(--blanco);
+    font-weight:800;font-size:13px;margin-top:8px;
+  }
+
+  .box-list{display:flex;flex-direction:column;gap:6px;margin:10px 0;}
+  .box-item{
+    display:flex;align-items:center;justify-content:space-between;
+    background:#f9f9fa;border-radius:8px;padding:8px 10px;font-size:13px;
+  }
+  .box-item .del{
+    background:none;border:none;color:var(--rojo-pend);font-size:18px;font-weight:800;
+    width:32px;height:32px;
+  }
+
+  .form-card{
+    background:var(--blanco);border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.08);
+    padding:14px;margin-top:14px;
+  }
+  .form-card label{font-size:12.5px;font-weight:700;display:block;margin-bottom:4px;margin-top:10px;}
+  .warn-text{font-size:12px;color:var(--amarillo);font-weight:700;margin-top:6px;}
+
+  .confirm-flash{
+    text-align:center;color:var(--verde);font-weight:800;font-size:14px;
+    margin-top:8px;animation:fadeOut 2s forwards;
+  }
+  @keyframes fadeOut{0%{opacity:1;}80%{opacity:1;}100%{opacity:0;}}
+
+  .celebrate{
+    text-align:center;background:#ecfdf3;color:#15803d;font-weight:800;
+    border-radius:8px;padding:10px;margin-top:8px;font-size:14px;
+  }
+
+  .section-title{font-size:14px;font-weight:800;margin:18px 0 8px;color:var(--gris);}
+  .report-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:10px;}
+  .report-table th,.report-table td{border-bottom:1px solid #eee;padding:6px 4px;text-align:left;}
+  .report-list{font-size:12.5px;line-height:1.6;}
+  .report-list .item-line{padding:6px 0;border-bottom:1px solid #f0f0f0;}
+
+  .empty-msg{text-align:center;color:#aaa;padding:30px 10px;font-size:13px;}
+
+  @media print{
+    header.topbar, .no-print{display:none !important;}
+    body{background:#fff;}
+    #app{max-width:100%;}
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+const PRODUCTOS_FACTURA = [
+  { codigo: "ESFP0531PC", descripcion: "ACEITE FULL SINTETICO AISIN GREENTECH+ 5W-30 API SP-RC, ILSAC GF-6 (Gasoline)", marca: "AISIN", categoria: "Aceites y Lubricantes", cantidadEsperada: 12, factura: "PDM-2257" },
+  { codigo: "ESSP1031PC", descripcion: "ACEITE SEMI-SINTETICO AISIN ECONTECH+ 10W-30 API SP-RC, ILSAC GF-6 (Gasoline)", marca: "AISIN", categoria: "Aceites y Lubricantes", cantidadEsperada: 11, factura: "PDM-2257" },
+  { codigo: "08880-83320", descripcion: "ACEITE TOY. 10W-30 SN/CF (4 LITROS)", marca: "GENUINE", categoria: "Aceites y Lubricantes", cantidadEsperada: 12, factura: "PDM-2257" },
+  { codigo: "BL13Y", descripcion: "BUJIA CHEV. C1500/SILVERADO 3500/KODIAK/ FORD BRONCO/F250/F350 [T16P-U/BP5F/AF42]", marca: "CHAMPION", categoria: "Bujías", cantidadEsperada: 100, factura: "PDM-2257" },
+  { codigo: "RS12YC", descripcion: "BUJIA COBRE CHEV. CAVALIER/CENTURY/LUMINA/ FORD EXPLORER 4.0L 01/06 [BPR5EFS]", marca: "CHAMPION", categoria: "Bujías", cantidadEsperada: 100, factura: "PDM-2257" },
+  { codigo: "RN9YC", descripcion: "BUJIA COBRE CHEV. CORSA/SPARK [W20EXR-U/BPR6EY]", marca: "CHAMPION", categoria: "Bujías", cantidadEsperada: 100, factura: "PDM-2257" },
+  { codigo: "RA8HC", descripcion: "BUJIA COBRE CHEV. SAIL/SPARK GT/N300/ SUZ. ALTO/CELERIO [DCPR7E]", marca: "CHAMPION", categoria: "Bujías", cantidadEsperada: 100, factura: "PDM-2257" },
+  { codigo: "RS14YC6", descripcion: "BUJIA COBRE FORD EXPLORER/FUSION/TRITON", marca: "CHAMPION", categoria: "Bujías", cantidadEsperada: 100, factura: "PDM-2257" },
+  { codigo: "RES9YCC4", descripcion: "BUJIA COBRE FORD FIESTA/ECOSPORT 1.6L 04/12 ZETEC/ROCAM [ITV16/PTR5A10]", marca: "CHAMPION", categoria: "Bujías", cantidadEsperada: 100, factura: "PDM-2257" },
+  { codigo: "RC10YC4", descripcion: "BUJIA COBRE HYU. ACCENT/ELANTRA/RIO/MIT. LANCER [K16PR-U11/RC10YC4/BKR5E-11]", marca: "CHAMPION", categoria: "Bujías", cantidadEsperada: 100, factura: "PDM-2257" },
+  { codigo: "RC12LYC", descripcion: "BUJIA COBRE JEEP CHEROKEE 4.0L /WRANGLER 4.0/2.5L", marca: "CHAMPION", categoria: "Bujías", cantidadEsperada: 100, factura: "PDM-2257" },
+  { codigo: "RE14MCC4", descripcion: "BUJIA COBRE JEEP COMANDER /DODGE RAM / GARND CHEROKEE 5.7L", marca: "CHAMPION", categoria: "Bujías", cantidadEsperada: 100, factura: "PDM-2257" },
+  { codigo: "N4C", descripcion: "BUJIA COBRE MOTO GN 125 [B7ES]", marca: "CHAMPION", categoria: "Bujías", cantidadEsperada: 100, factura: "PDM-2257" },
+  { codigo: "RC12YC", descripcion: "BUJIA COBRE TOY. COROLLA 1.8L/TERIOS/FIAT/ HYU. ACCENT [K16PR-U11#4/BKR5ES-11]", marca: "CHAMPION", categoria: "Bujías", cantidadEsperada: 100, factura: "PDM-2257" },
+  { codigo: "T16P-U#4", descripcion: "BUJIA FORD/CHEV/JEEP BL15", marca: "DENSO", categoria: "Bujías", cantidadEsperada: 100, factura: "PDM-2257" },
+  { codigo: "W20FP-U#4", descripcion: "BUJIA MOTO HONDA/YAMAHA/SUZUKI/FUERA DE BORDA.", marca: "DENSO", categoria: "Bujías", cantidadEsperada: 100, factura: "PDM-2257" },
+  { codigo: "W16EX-U#4", descripcion: "BUJIA TOY. 2F/3F COROLLA AVILA", marca: "DENSO", categoria: "Bujías", cantidadEsperada: 100, factura: "PDM-2257" },
+  { codigo: "90919-T1004", descripcion: "BUJIA TOY. INNOVA/FORTUNER/HILUX/ 2TRFE 04-15", marca: "GENUINE", categoria: "Bujías", cantidadEsperada: 50, factura: "PDM-2257" },
+  { codigo: "K20R-U#4", descripcion: "BUJIA TOY. L/CRUISER/CELICA/MR2/MACHITO/PRADO/MERU [90919-01166]", marca: "DENSO", categoria: "Bujías", cantidadEsperada: 48, factura: "PDM-2257" },
+  { codigo: "W16EP-U#4", descripcion: "BUJIA UNIVERSAL", marca: "DENSO", categoria: "Bujías", cantidadEsperada: 100, factura: "PDM-2257" },
+  { codigo: "T16EPR-U#4", descripcion: "BUJIA TOY. COROLLA/2ZZ/3ZZ/MAZDA 3/2010", marca: "DENSO", categoria: "Bujías", cantidadEsperada: 100, factura: "PDM-2257" },
+  { codigo: "A1N029V-S", descripcion: "PASTILLA DE FRENO DEL. TOY. 4500/4RUNNER 95/02 /PRADO", marca: "ADVICS", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "A1N005V-S", descripcion: "PASTILLA DE FRENO TOY. L/CRUISER CHASIS LARGO/ AUTANA/MACHITO/PRADO/4RUNNER", marca: "ADVICS", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "WC2268", descripcion: "PASTILLA/TACO DE FRENO DEL TOY. GRANACE 2.8L /HIACE 2.8L /QUANTUM 2.8L 19/~", marca: "WAGNER", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "A1N155Y", descripcion: "PASTILLA/TACO DE FRENO DEL TOY. YARIS 06/13 / YARIS ADVANCE 06-", marca: "ADVICS", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "WC1522", descripcion: "PASTILLA/TACO DE FRENO DEL. CHEV. CRUZE 10/~/ ORLANDO 11/~", marca: "WAGNER", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "WC1590", descripcion: "PASTILLA/TACO DE FRENO DEL. CHEV. SPARK 10/~", marca: "WAGNER", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "WX679", descripcion: "PASTILLA/TACO DE FRENO DEL. FORD F150/FORTALEZA 96/04", marca: "WAGNER", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "WX756", descripcion: "PASTILLA/TACO DE FRENO DEL. FORD F250/F350 00-10", marca: "WAGNER", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "WX1333", descripcion: "PASTILLA/TACO DE FRENO DEL. FORD F250/F350 SUPER DUTY 09/13", marca: "WAGNER", categoria: "Pastillas de Freno", cantidadEsperada: 1, factura: "PDM-2257" },
+  { codigo: "WX652", descripcion: "PASTILLA/TACO DE FRENO DEL. FORD EXPLORER/RANGER 92-03/MAZ. B2600 85-99", marca: "WAGNER", categoria: "Pastillas de Freno", cantidadEsperada: 8, factura: "PDM-2257" },
+  { codigo: "WD465A", descripcion: "PASTILLA/TACO DE FRENO DEL. HON. CIVIC 01/13/ CR-V 95/05/ ACCORD 94/02", marca: "WAGNER", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "WD560", descripcion: "PASTILLA/TACO DE FRENO DEL. HON. CIVIC 1.6/1.5L 91-00", marca: "WAGNER", categoria: "Pastillas de Freno", cantidadEsperada: 8, factura: "PDM-2257" },
+  { codigo: "WD273", descripcion: "PASTILLA/TACO DE FRENO DEL. HON. CIVIC 93/01", marca: "WAGNER", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "WX943", descripcion: "PASTILLA/TACO DE FRENO DEL. HON. CR-V 02/06/ ACCORD 02/~/ PILOT 02/08/ ELEMENT 03/09", marca: "WAGNER", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "WC1593", descripcion: "PASTILLA/TACO DE FRENO DEL. HYU. ACCENT 17-19 /ELANTRA 12/~/ SANTA FE 12/19/ KIA RIO 17/- K3/FORTE/CERATO 12/~/ STONIC 20/~/ SORENTO 09/15/ GEELY GX3 19/21", marca: "WAGNER", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "WD1156", descripcion: "PASTILLA/TACO DE FRENO DEL. HYU. ACCENT/ KIA RIO 06/11", marca: "WAGNER", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "WX497", descripcion: "PASTILLA/TACO DE FRENO DEL. HYU. ACCENT/VERNA/EXCEL 93/05/ GETZ 06/11/ EON 11/18", marca: "WAGNER", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "WC1847", descripcion: "PASTILLA/TACO DE FRENO DEL. HYU. TUCSON IX35/KIA SPORTAGE 15/21 2WD", marca: "WAGNER", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "WD1080", descripcion: "PASTILLA/TACO DE FRENO DEL. JEEP GRAND CHEROKEE/COMANDER EXL/EKG/EVA 05-10", marca: "WAGNER", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "WD1273", descripcion: "PASTILLA/TACO DE FRENO DEL. JEEP CHEROKEE LIBERTY KK 08/13/ WRANGLER/CARAVAN/JOURNEY 07/~", marca: "WAGNER", categoria: "Pastillas de Freno", cantidadEsperada: 6, factura: "PDM-2257" },
+  { codigo: "WX774", descripcion: "PASTILLA/TACO DE FRENO DEL. KIA SPORTAGE 93/06/ RETONA 99/03", marca: "WAGNER", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "WX830", descripcion: "PASTILLA/TACO DE FRENO DEL. NIS. FRONTIER 01/~/ NAVARA 02/13/ NP300 08/~/ BAIC BJ40 21/~", marca: "WAGNER", categoria: "Pastillas de Freno", cantidadEsperada: 5, factura: "PDM-2257" },
+  { codigo: "WX855", descripcion: "PASTILLA/TACO DE FRENO DEL. NIS. PATHFINDER 95/05/ TERRANO 96/~/ FRONTIER 00/~ X-TRAIL T30 00/13", marca: "WAGNER", categoria: "Pastillas de Freno", cantidadEsperada: 4, factura: "PDM-2257" },
+  { codigo: "WX510", descripcion: "PASTILLA/TACO DE FRENO DEL. NIS. SENTRA B13", marca: "WAGNER", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "A1N199", descripcion: "PASTILLA/TACO DE FRENO DEL. TOY. COROLLA 02/08 1ZZ/3ZZ", marca: "ADVICS", categoria: "Pastillas de Freno", cantidadEsperada: 6, factura: "PDM-2257" },
+  { codigo: "A1N185V-S", descripcion: "PASTILLA/TACO DE FRENO DEL. TOY. COROLLA 07-/RAV4 05-", marca: "ADVICS", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "A1N074V-S", descripcion: "PASTILLA/TACO DE FRENO DEL. TOY. COROLLA 82/87", marca: "ADVICS", categoria: "Pastillas de Freno", cantidadEsperada: 2, factura: "PDM-2257" },
+  { codigo: "A1N034V-S", descripcion: "PASTILLA/TACO DE FRENO DEL. TOY. COROLLA/STARLET/TERCEL 82/99 (V-S)", marca: "ADVICS", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "A1N034Y", descripcion: "PASTILLA/TACO DE FRENO DEL. TOY. COROLLA/STARLET/TERCEL 82/99 (Y)", marca: "ADVICS", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "WX1344", descripcion: "PASTILLA/TACO DE FRENO DEL. TOY. HIACE 95/~ DYNA 01/~", marca: "WAGNER", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "A1N229Y", descripcion: "PASTILLA/TACO DE FRENO DEL. TOY. HIACE 98/~ /1KD/2KD/2TR/5L/ 220/TRH221 2010/~", marca: "ADVICS", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "WX303", descripcion: "PASTILLA/TACO DE FRENO DEL. TOY. HIACE/HILUX 82/01 2WD/ V.W. TARO 98/94", marca: "WAGNER", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "A1N036", descripcion: "PASTILLA/TACO DE FRENO DEL. TOY. HILUX 4X2/HIACE 90/98", marca: "ADVICS", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "A1N036V-S", descripcion: "PASTILLA/TACO DE FRENO DEL. TOY. HILUX 4X2/HIACE 90/98 (V-S)", marca: "ADVICS", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "A1N011", descripcion: "PASTILLA/TACO DE FRENO DEL. TOY. HILUX VIGO 3.0/KAVAK/4RUNNER 03/16 /PRADO 02/15 /TUNDRA 03-", marca: "ADVICS", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "WD976", descripcion: "PASTILLA/TACO DE FRENO DEL. TOY. HILUX VIGO 3.0L/ 4RUNNER 03/16/ PRADO 02/15/ TUNDRA 03/~/ JAC T6/T8/T9 18/~", marca: "WAGNER", categoria: "Pastillas de Freno", cantidadEsperada: 400, factura: "PDM-2257" },
+  { codigo: "A1N217V-S", descripcion: "PASTILLA/TACO DE FRENO DEL. TOY. HILUX VIGO 4x4 05/15", marca: "ADVICS", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "A1N141V-S", descripcion: "PASTILLA/TACO DE FRENO DEL. TOY. HILUX VIGO/ ARG.4x4 05/- KUN/TGN40 (V-S)", marca: "ADVICS", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "A1N141Y", descripcion: "PASTILLA/TACO DE FRENO DEL. TOY. HILUX VIGO/ ARG.4x4 05/- KUN/TGN40 (Y)", marca: "ADVICS", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "A1N144V-S", descripcion: "PASTILLA/TACO DE FRENO DEL. TOY. L/CRUISER/MACHITO/CHASIS LARGA/SAMURAY/PRADO.", marca: "ADVICS", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "WX772", descripcion: "PASTILLA/TACO DE FRENO DEL. TOY. LAND CRUISER PRADO J100/120/150 98/10/ SEQUOIA 00/07 4WD", marca: "WAGNER", categoria: "Pastillas de Freno", cantidadEsperada: 8, factura: "PDM-2257" },
+  { codigo: "WC1303", descripcion: "PASTILLA/TACO DE FRENO DEL. TOY. LAND CRUISER RORAIMA 16/20/ TUNDRA/ 4RUNNER 10/19", marca: "WAGNER", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "WC1567", descripcion: "PASTILLA/TACO DE FRENO DEL. TOY. LAND CRUISER/FORTUNER/HILUX/04/~", marca: "WAGNER", categoria: "Pastillas de Freno", cantidadEsperada: 5, factura: "PDM-2257" },
+  { codigo: "WD862", descripcion: "PASTILLA/TACO DE FRENO DEL. TOY. RAV-4 2AZFE 00-05", marca: "WAGNER", categoria: "Pastillas de Freno", cantidadEsperada: 5, factura: "PDM-2257" },
+  { codigo: "G1N005V-S", descripcion: "PASTILLA/TACO DE FRENO DEL. TOY. TERIOS (TODOS) 00/10/ MIT. LANCER 95/03", marca: "ADVICS", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "A1N068", descripcion: "PASTILLA/TACO DE FRENO DEL. TOY. YARIS 00/05/COROLLA 99/07", marca: "ADVICS", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "A1N123V-S", descripcion: "PASTILLA/TACO DE FRENO DEL. TOY. YARIS 06/11", marca: "ADVICS", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "WC831", descripcion: "PASTILLA/TACO DE FRENO DEL. TOY. YARIS 1/2NZFE 99-06", marca: "WAGNER", categoria: "Pastillas de Freno", cantidadEsperada: 8, factura: "PDM-2257" },
+  { codigo: "A1N067", descripcion: "PASTILLA/TACO DE FRENO DEL. TOY. YARIS 99/05/ COROLLA 01/07/ PRIUS 03/09", marca: "ADVICS", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "WD465", descripcion: "PASTILLA/TACO DE FRENO HON.ACCORD 02/12 /CIVIC 05/12 /C-RV 01/05", marca: "WAGNER", categoria: "Pastillas de Freno", cantidadEsperada: 10, factura: "PDM-2257" },
+  { codigo: "AL-1012010", descripcion: "FILTRO DE ACEITE CHERY ORINOCO", marca: "A1 FILTERS", categoria: "Filtros de Aceite", cantidadEsperada: 80, factura: "KMC-2026-00243" },
+  { codigo: "AL-12027", descripcion: "FILTRO DE ACEITE TOY. RORAIMA/TUNDRA/SEQUOIA (P979)", marca: "A1 FILTERS", categoria: "Filtros de Aceite", cantidadEsperada: 100, factura: "KMC-2026-00243" },
+  { codigo: "AL-19547", descripcion: "FILTRO DE ACEITE TOY.4RUNNER 10/- (ELEMENTO) (P968)", marca: "A1 FILTERS", categoria: "Filtros de Aceite", cantidadEsperada: 100, factura: "KMC-2026-00243" },
+  { codigo: "AL-19626", descripcion: "FILTRO DE ACEITE CHEV. CRUZE/SONIC/TRACKER (P981/CH10246)", marca: "A1 FILTERS", categoria: "Filtros de Aceite", cantidadEsperada: 100, factura: "KMC-2026-00243" },
+  { codigo: "AL-20004", descripcion: "FILTRO DE ACEITE TOYOTA HILUX/PRADO/LAND CRUISER", marca: "A1 FILTERS", categoria: "Filtros de Aceite", cantidadEsperada: 160, factura: "KMC-2026-00243" },
+  { codigo: "AL-2", descripcion: "FILTRO DE ACEITE FORD F150/FORTALEZA/F350", marca: "A1 FILTERS", categoria: "Filtros de Aceite", cantidadEsperada: 120, factura: "KMC-2026-00243" },
+  { codigo: "AL-2C", descripcion: "FILTRO DE ACEITE FORD F-450, EXPLORER (CORT)", marca: "A1 FILTERS", categoria: "Filtros de Aceite", cantidadEsperada: 80, factura: "KMC-2026-00243" },
+  { codigo: "AL-3387", descripcion: "FILTRO DE ACEITE AVEO/OPTRA/CIELO/CORSA (PH47)", marca: "A1 FILTERS", categoria: "Filtros de Aceite", cantidadEsperada: 160, factura: "KMC-2026-00243" },
+  { codigo: "AL-3593", descripcion: "FILTRO DE ACEITE KIA RIO/PICANTO/FORTHING T5 EVO /HAVAL H1/H2/H3 /JAC S2/S3", marca: "A1 FILTERS", categoria: "Filtros de Aceite", cantidadEsperada: 150, factura: "KMC-2026-00243" },
+  { codigo: "AL-36", descripcion: "FILTRO DE ACEITE ENCAVA BUS 600, 1000, 3000, CAT", marca: "A1 FILTERS", categoria: "Filtros de Aceite", cantidadEsperada: 90, factura: "KMC-2026-00243" },
+  { codigo: "AL-3600", descripcion: "FILTRO DE ACEITE FIESTA 01/14, F150 97/07 (PH2825/PH400)", marca: "A1 FILTERS", categoria: "Filtros de Aceite", cantidadEsperada: 120, factura: "KMC-2026-00243" },
+  { codigo: "AL-3614", descripcion: "FILTRO DE ACEITE TOY. 4RUNNER/HILUX/STEEM/NEON/CHANGAN ALSVIN (PH2835/90915-YZZD3)", marca: "A1 FILTERS", categoria: "Filtros de Aceite", cantidadEsperada: 160, factura: "KMC-2026-00243" },
+  { codigo: "AL-3682", descripcion: "FILTRO DE ACEITE NISSAN SENTRA / DMAX 05/06", marca: "A1 FILTERS", categoria: "Filtros de Aceite", cantidadEsperada: 160, factura: "KMC-2026-00243" },
+  { codigo: "AL-44155", descripcion: "FILTRO DE ACEITE TOY. CAMRY/RAV4 (04152-YZZA1)(P967)", marca: "A1 FILTERS", categoria: "Filtros de Aceite", cantidadEsperada: 100, factura: "KMC-2026-00243" },
+  { codigo: "AL-4967", descripcion: "FILTRO DE ACEITE TOY. COROLLA/STARLET TODOS (PH2840/90915-03001)", marca: "A1 FILTERS", categoria: "Filtros de Aceite", cantidadEsperada: 50, factura: "KMC-2026-00243" },
+  { codigo: "AL-4997", descripcion: "FILTRO DE ACEITE SPARK/CHANGAN/QQ /TOY. RAIZE/ YARIS 23/~", marca: "A1 FILTERS", categoria: "Filtros de Aceite", cantidadEsperada: 120, factura: "KMC-2026-00243" },
+  { codigo: "AL-5796", descripcion: "FILTRO DE ACEITE MEGANE/TWINGO/CLIO/LOGAN/LAGUNA/SYMBOL/SCENIC/KANGOO", marca: "A1 FILTERS", categoria: "Filtros de Aceite", cantidadEsperada: 100, factura: "KMC-2026-00243" },
+  { codigo: "AL-5949", descripcion: "FILTRO DE ACEITE FIAT PALIO/SIENA/UNO/ MIT. L200 2023", marca: "A1 FILTERS", categoria: "Filtros de Aceite", cantidadEsperada: 100, factura: "KMC-2026-00243" },
+  { codigo: "AL-61759", descripcion: "FILTRO DE ACEITE CHEROKEE LIBERTY 3.7 V6 (PH500)", marca: "A1 FILTERS", categoria: "Filtros de Aceite", cantidadEsperada: 80, factura: "KMC-2026-00243" },
+  { codigo: "AL-8", descripcion: "FILTRO DE ACEITE FORD 6 Y 8 CIL TOYOTA MACH (PH8A)", marca: "A1 FILTERS", categoria: "Filtros de Aceite", cantidadEsperada: 80, factura: "KMC-2026-00243" },
+  { codigo: "AL-92095", descripcion: "FILTRO DE ACEITE CHEV. SPARK GT/SAIL/N300/BEAT/AVEO 18/24", marca: "A1 FILTERS", categoria: "Filtros de Aceite", cantidadEsperada: 100, factura: "KMC-2026-00243" },
+  { codigo: "AL-96796", descripcion: "FILTRO DE ACEITE TOY. COROLLA 09/- (ELEMENTO)(04152-YZZA6)", marca: "A1 FILTERS", categoria: "Filtros de Aceite", cantidadEsperada: 100, factura: "KMC-2026-00243" },
+  { codigo: "13272717", descripcion: "FILTRO DE AIRE CHEV. CRUZE 09/~", marca: "A1 FILTERS", categoria: "Filtros de Aire", cantidadEsperada: 80, factura: "KMC-2026-00243" },
+  { codigo: "17801-11130", descripcion: "FILTRO DE AIRE TOY. PRADO 1GD-FTV 2.8L 15/~", marca: "A1 FILTERS", categoria: "Filtros de Aire", cantidadEsperada: 100, factura: "KMC-2026-00243" },
+  { codigo: "17801-21030", descripcion: "FILTRO DE AIRE TOY. YARIS 00/05 1NZ/2NZ-FE", marca: "A1 FILTERS", categoria: "Filtros de Aire", cantidadEsperada: 120, factura: "KMC-2026-00243" },
+  { codigo: "17801-31090", descripcion: "FILTRO DE AIRE TOY. 4RUNER/KAVAC/FORTUNER 1GRFE (17801-OP010)", marca: "A1 FILTERS", categoria: "Filtros de Aire", cantidadEsperada: 100, factura: "KMC-2026-00243" },
+  { codigo: "17801-31120", descripcion: "FILTRO DE AIRE TOY. RAV 4/CAMRY/PREVIA (17801-AD010)", marca: "A1 FILTERS", categoria: "Filtros de Aire", cantidadEsperada: 100, factura: "KMC-2026-00243" },
+  { codigo: "17801-BZ140", descripcion: "FILTRO DE AIRE TOY. AGYA", marca: "A1 FILTERS", categoria: "Filtros de Aire", cantidadEsperada: 100, factura: "KMC-2026-00243" },
+  { codigo: "S12-1109111", descripcion: "FILTRO DE AIRE CHERY A1/ARAUCA 1.3L 16V DOHC", marca: "A1 FILTERS", categoria: "Filtros de Aire", cantidadEsperada: 80, factura: "KMC-2026-00243" },
+  { codigo: "AK-52045", descripcion: "FILTRO DE AIRE FORD EXPLORER 3.5L 11/~ /EDGE 07/~ /MAZ. CX-9 07/~", marca: "A1 FILTERS", categoria: "Filtros de Aire", cantidadEsperada: 80, factura: "KMC-2026-00243" },
+  { codigo: "AK-8004", descripcion: "FILTRO DE AIRE FORD FORTALEZA/ F-150 (F50X-9601-A)", marca: "A1 FILTERS", categoria: "Filtros de Aire", cantidadEsperada: 108, factura: "KMC-2026-00243" },
+  { codigo: "AF-3541", descripcion: "FILTRO DE COMBUSTIBLE TOY. TERCEL 91/99 /CAMRY 5SFE /MIT. LANCER 1.6/1.8 94/99 /MONTERO 94/08", marca: "A1 FILTERS", categoria: "Filtros de Combustible", cantidadEsperada: 40, factura: "KMC-2026-00243" },
+  { codigo: "AF-3627", descripcion: "FILTRO DIESEL ISU. D-MAX 3.0L 04/13 / CHEV. NPR/FVR /TOY. COASTER", marca: "A1 FILTERS", categoria: "Filtros de Combustible", cantidadEsperada: 100, factura: "KMC-2026-00243" },
+  { codigo: "AF-5010", descripcion: "FILTRO DE COMBUSTIBLE COROLLA 1.6 (23300-15010)", marca: "A1 FILTERS", categoria: "Filtros de Combustible", cantidadEsperada: 100, factura: "KMC-2026-00243" },
+  { codigo: "AF-5237", descripcion: "FILTRO DE COMBUSTIBLE NIS. SENTRA B13/14 16400-10Y00", marca: "A1 FILTERS", categoria: "Filtros de Combustible", cantidadEsperada: 100, factura: "KMC-2026-00243" },
+  { codigo: "AF-6680", descripcion: "FILTRO DE COMBUSTIBLE TOY. PRADO 00/06/ 4RUNNER 91/02", marca: "A1 FILTERS", categoria: "Filtros de Combustible", cantidadEsperada: 150, factura: "KMC-2026-00243" },
+  { codigo: "AF-9292", descripcion: "FILTRO DE COMBUSTIBLE FIESTA POWER/ECOSPORT", marca: "A1 FILTERS", categoria: "Filtros de Combustible", cantidadEsperada: 100, factura: "KMC-2026-00243" },
+  { codigo: "AF-9305", descripcion: "FILTRO DE COMBUSTIBLE ACCENT 1.3/1.5 (31911-22000)", marca: "A1 FILTERS", categoria: "Filtros de Combustible", cantidadEsperada: 100, factura: "KMC-2026-00243" },
+  { codigo: "23300-30310", descripcion: "FILTRO DE COMBUSTIBLE TOY. LAND CRUISER 2UZ-FE 4.7L 07/12", marca: "A1 FILTERS", categoria: "Filtros de Combustible", cantidadEsperada: 100, factura: "KMC-2026-00243" },
+  { codigo: "23390-0L040-AF-16262", descripcion: "FILTRO DE COMBUSTIBLE TOY. HILUX 1KD/2KD/5L 05/~ /ISU. D-MAX 2.5/3.0 13/~", marca: "A1 FILTERS", categoria: "Filtros de Combustible", cantidadEsperada: 100, factura: "KMC-2026-00243" },
+  { codigo: "23390-0L070-AF-26255", descripcion: "FILTRO DIESEL TOY. HILUX REVO 16/~", marca: "A1 FILTERS", categoria: "Filtros de Combustible", cantidadEsperada: 100, factura: "KMC-2026-00243" },
+  { codigo: "23390-51070", descripcion: "FILTRO DIESEL TOY. LAND CRUISER 200 /MACHITO 1VD-FTV V8 4.5L 07/~ /LEXUS LX450d 15/~", marca: "A1 FILTERS", categoria: "Filtros de Combustible", cantidadEsperada: 100, factura: "KMC-2026-00243" },
+  { codigo: "80292-T5R-A01", descripcion: "FILTRO DE CABINA HON. CR-V 16/~ /CITY 17/~ /CIVIC 21/~ /HR-V 18/~ /PILOT 22/~", marca: "A1 FILTERS", categoria: "Filtros de Cabina", cantidadEsperada: 100, factura: "KMC-2026-00243" },
+  { codigo: "96425700", descripcion: "FILTRO DE CABINA CHEV. SPARK 05/~", marca: "A1 FILTERS", categoria: "Filtros de Cabina", cantidadEsperada: 40, factura: "KMC-2026-00243" },
+  { codigo: "96539649", descripcion: "FILTRO DE CABINA CHEV. AVEO/KALOS", marca: "A1 FILTERS", categoria: "Filtros de Cabina", cantidadEsperada: 100, factura: "KMC-2026-00243" },
+  { codigo: "97133-0U000", descripcion: "FILTRO DE CABINA HYU. ACCENT/VERNA/ KIA SOLUTO 16/-", marca: "A1 FILTERS", categoria: "Filtros de Cabina", cantidadEsperada: 100, factura: "KMC-2026-00243" },
+  { codigo: "97133-1E100", descripcion: "FILTRO DE CABINA HYU. ACCENT 06/10 (97133-2H000)", marca: "A1 FILTERS", categoria: "Filtros de Cabina", cantidadEsperada: 100, factura: "KMC-2026-00243" },
+  { codigo: "CV6Z-19N619-A", descripcion: "FILTRO DE CABINA FORD ESCAPE 1.6L 12/16 /FOCUS 12/~ /LINCOLN MKC 14/19", marca: "A1 FILTERS", categoria: "Filtros de Cabina", cantidadEsperada: 57, factura: "KMC-2026-00243" },
+  { codigo: "SW-500", descripcion: "SHAMPOO CON CERA CONCENTRADO 500ml", marca: "A1 FILTERS", categoria: "Químicos", cantidadEsperada: 96, factura: "KMC-2026-00243" },
+  { codigo: "D20TCI132011", descripcion: "FILTRO DE ACEITE CHANGAN HUNTER F70 19/~ /SAIC MAXUS G10", marca: "A1 FILTERS", categoria: "Filtros de Aceite", cantidadEsperada: 100, factura: "KMC-2026-00243" },
+  { codigo: "13271190", descripcion: "FILTRO DE CABINA CHEV. TRAX/TRACKER 16/~ /SPARK 1.2L 12/16 /SONIC 11/~ /ORLANDO 11/~ /AVEO 15/~ /TRAVERSE 17/~", marca: "A1 FILTERS", categoria: "Filtros de Cabina", cantidadEsperada: 100, factura: "KMC-2026-00243" },
+  { codigo: "27891-3SG0A", descripcion: "FILTRO DE CABINA NIS. SENTRA/TIIDA 11/~", marca: "A1 FILTERS", categoria: "Filtros de Cabina", cantidadEsperada: 100, factura: "KMC-2026-00243" },
+  { codigo: "8119030-BU01", descripcion: "FILTRO DE CABINA CHANGAN HUNTER", marca: "A1 FILTERS", categoria: "Filtros de Cabina", cantidadEsperada: 100, factura: "KMC-2026-00243" },
+  { codigo: "97133-2B010", descripcion: "FILTRO DE CABINA HYU. SANTA FE 06~/SONATA", marca: "A1 FILTERS", categoria: "Filtros de Cabina", cantidadEsperada: 100, factura: "KMC-2026-00243" },
+  { codigo: "97133-F2000", descripcion: "FILTRO DE CABINA HYU. TUCSON 15/~/ELANTRA/i30 16/~/KIA SPORTAGE/RIO 17/~", marca: "A1 FILTERS", categoria: "Filtros de Cabina", cantidadEsperada: 100, factura: "KMC-2026-00243" },
+];
+
+const STORAGE_KEY = "km0_recepcion_estado";
+
+function cargarEstado(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      if(parsed && parsed.registros) return parsed;
+    }
+  }catch(e){}
+  const ahora = new Date().toISOString();
+  return { sesion_id: ahora.slice(0,10), fecha_inicio: ahora, fecha_ultima_actualizacion: ahora, registros: {} };
+}
+
+let estado = cargarEstado();
+
+function guardarEstado(){
+  estado.fecha_ultima_actualizacion = new Date().toISOString();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(estado));
+}
+
+function normalizar(str){
+  return (str||"").toString().toLowerCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g,"");
+}
+
+function unidadesRecibidas(codigo){
+  const lista = estado.registros[codigo] || [];
+  return lista.reduce((sum, r) => sum + r.unidades, 0);
+}
+
+function estadoProducto(producto){
+  const recibido = unidadesRecibidas(producto.codigo);
+  if(recibido <= 0) return "pendiente";
+  if(recibido >= producto.cantidadEsperada) return "completo";
+  return "parcial";
+}
+
+// ---------- Routing / state ----------
+let vista = "lista"; // lista | detalle | reporte
+let productoActual = null; // codigo
+let filtroActivo = "todos";
+let textoBusqueda = "";
+
+function irALista(){ vista="lista"; productoActual=null; render(); }
+function irADetalle(codigo){ vista="detalle"; productoActual=codigo; render(); }
+function irAReporte(){ vista="reporte"; render(); }
+
+// ---------- Render ----------
+const appEl = document.getElementById("app");
+
+function render(){
+  if(vista === "lista") renderLista();
+  else if(vista === "detalle") renderDetalle();
+  else if(vista === "reporte") renderReporte();
+}
+
+function renderHeader(titulo, subtitulo, conBack, accionBack){
+  return `
+    <header class="topbar">
+      ${conBack ? `<button class="back" id="btnBack">‹</button>` : ""}
+      <div>
+        <h1>${titulo}</h1>
+        ${subtitulo ? `<p class="sub">${subtitulo}</p>` : ""}
+      </div>
+    </header>
+  `;
+}
+
+function contarEstados(){
+  let completos=0, parciales=0, pendientes=0;
+  PRODUCTOS_FACTURA.forEach(p=>{
+    const e = estadoProducto(p);
+    if(e==="completo") completos++;
+    else if(e==="parcial") parciales++;
+    else pendientes++;
+  });
+  return {completos, parciales, pendientes, total: PRODUCTOS_FACTURA.length};
+}
+
+function renderLista(){
+  const {completos, parciales, pendientes, total} = contarEstados();
+  const pct = total ? Math.round((completos/total)*100) : 0;
+
+  let productos = PRODUCTOS_FACTURA.slice();
+
+  if(textoBusqueda.trim()){
+    const q = normalizar(textoBusqueda);
+    productos = productos.filter(p =>
+      normalizar(p.codigo).includes(q) || normalizar(p.descripcion).includes(q)
+    );
+  }
+
+  if(filtroActivo !== "todos"){
+    productos = productos.filter(p => estadoProducto(p) === filtroActivo);
+  }
+
+  const ordenPrioridad = {pendiente:0, parcial:1, completo:2};
+  productos.sort((a,b)=> ordenPrioridad[estadoProducto(a)] - ordenPrioridad[estadoProducto(b)]);
+
+  const itemsHtml = productos.length === 0
+    ? `<div class="empty-msg">No se encontraron productos.</div>`
+    : productos.map(p=>{
+        const recibido = unidadesRecibidas(p.codigo);
+        const est = estadoProducto(p);
+        const labelEstado = est==="completo"?"COMPLETO":est==="parcial"?"PARCIAL":"PENDIENTE";
+        return `
+          <div class="product-item ${est}" data-codigo="${escAttr(p.codigo)}">
+            <div class="info">
+              <div class="codigo">${esc(p.codigo)}</div>
+              <div class="desc">${esc(p.descripcion)}</div>
+              <div class="meta">${esc(p.marca)} · ${recibido} / ${p.cantidadEsperada} unidades</div>
+            </div>
+            <span class="chip ${est}">${labelEstado}</span>
+          </div>
+        `;
+      }).join("");
+
+  appEl.innerHTML = `
+    ${renderHeader("KM0 — Recepción de Inventario")}
+    <div class="container">
+      <div class="progress-wrap">
+        <div class="progress-label">${completos} de ${total} productos completados (${pct}%)</div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
+      </div>
+      <div class="cards-row">
+        <div class="stat-card completos"><div class="num">${completos}</div><div class="lbl">✅ Completos</div></div>
+        <div class="stat-card parciales"><div class="num">${parciales}</div><div class="lbl">⚠️ Parciales</div></div>
+        <div class="stat-card pendientes"><div class="num">${pendientes}</div><div class="lbl">❌ Sin registrar</div></div>
+      </div>
+      <div class="search-box">
+        <input type="text" id="buscador" placeholder="Buscar por código o descripción..." value="${escAttr(textoBusqueda)}">
+      </div>
+      <div class="filters">
+        <button class="filter-btn ${filtroActivo==='todos'?'active':''}" data-filtro="todos">Todos</button>
+        <button class="filter-btn ${filtroActivo==='pendiente'?'active':''}" data-filtro="pendiente">Pendientes</button>
+        <button class="filter-btn ${filtroActivo==='parcial'?'active':''}" data-filtro="parcial">Parciales</button>
+        <button class="filter-btn ${filtroActivo==='completo'?'active':''}" data-filtro="completo">Completos</button>
+      </div>
+      <div class="product-list">${itemsHtml}</div>
+      <button class="btn btn-primary btn-block no-print" id="btnReporte">📋 Ver reporte final</button>
+    </div>
+  `;
+
+  document.getElementById("buscador").addEventListener("input", e=>{
+    textoBusqueda = e.target.value;
+    renderLista();
+    document.getElementById("buscador").focus();
+    const val = document.getElementById("buscador").value;
+    document.getElementById("buscador").setSelectionRange(val.length, val.length);
+  });
+  document.querySelectorAll(".filter-btn").forEach(b=>{
+    b.addEventListener("click", ()=>{ filtroActivo = b.dataset.filtro; renderLista(); });
+  });
+  document.querySelectorAll(".product-item").forEach(item=>{
+    item.addEventListener("click", ()=> irADetalle(item.dataset.codigo));
+  });
+  document.getElementById("btnReporte").addEventListener("click", irAReporte);
+}
+
+let mensajeFlash = null; // {tipo:'ok'|'celebracion', texto}
+
+function renderDetalle(){
+  const producto = PRODUCTOS_FACTURA.find(p=>p.codigo===productoActual);
+  if(!producto){ irALista(); return; }
+
+  const recibido = unidadesRecibidas(producto.codigo);
+  const est = estadoProducto(producto);
+  const labelEstado = est==="completo"?"COMPLETO":est==="parcial"?"PARCIAL":"PENDIENTE";
+  const colorEstado = est==="completo" ? "var(--verde)" : est==="parcial" ? "var(--amarillo)" : "var(--rojo-pend)";
+  const pct = Math.min(100, Math.round((recibido/producto.cantidadEsperada)*100));
+
+  const cajas = (estado.registros[producto.codigo]||[]).slice().sort((a,b)=> new Date(b.timestamp)-new Date(a.timestamp));
+  const cajasHtml = cajas.length === 0
+    ? `<div class="empty-msg">Todavía no se ha registrado ninguna caja.</div>`
+    : cajas.map((c,idx)=>{
+        const hora = new Date(c.timestamp).toLocaleTimeString('es-VE',{hour:'2-digit',minute:'2-digit'});
+        return `
+          <div class="box-item">
+            <span>Bulto #${esc(c.bulto)} · ${esc(c.unidades)} unidades · ${hora}</span>
+            <button class="del" data-bulto="${escAttr(c.bulto)}" data-ts="${escAttr(c.timestamp)}">×</button>
+          </div>
+        `;
+      }).join("");
+
+  appEl.innerHTML = `
+    ${renderHeader("Detalle del producto", null, true)}
+    <div class="container">
+      <div class="detail-header-card">
+        <div class="codigo-big">${esc(producto.codigo)}</div>
+        <h2>${esc(producto.descripcion)}</h2>
+        <div class="marca-cat">${esc(producto.marca)} · ${esc(producto.categoria)} · Factura ${esc(producto.factura)}</div>
+        <div class="recibido-line">Recibido: ${recibido} unidades de ${producto.cantidadEsperada} esperadas</div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
+        <span class="estado-chip-big" style="background:${colorEstado}">${labelEstado}</span>
+        ${mensajeFlash && mensajeFlash.tipo==='celebracion' ? `<div class="celebrate">🎉 ¡Producto completado!</div>` : ""}
+        ${mensajeFlash && mensajeFlash.tipo==='ok' ? `<div class="confirm-flash">✓ ${esc(mensajeFlash.texto)}</div>` : ""}
+      </div>
+
+      <div class="section-title">Cajas registradas</div>
+      <div class="box-list">${cajasHtml}</div>
+
+      <div class="form-card">
+        <div class="section-title" style="margin-top:0;">Registrar nueva caja</div>
+        <label for="inpBulto"># Bulto</label>
+        <input type="text" inputmode="numeric" id="inpBulto" placeholder="Ej: 47" maxlength="3">
+        <label for="inpUnidades">Unidades en esta caja</label>
+        <input type="text" inputmode="numeric" id="inpUnidades" placeholder="Ej: 20" maxlength="5">
+        <div id="formError" class="warn-text" style="display:none;"></div>
+        <button class="btn btn-primary btn-block" id="btnRegistrar">✓ Registrar caja</button>
+      </div>
+    </div>
+  `;
+
+  mensajeFlash = null;
+
+  document.getElementById("btnBack").addEventListener("click", irALista);
+  document.querySelectorAll(".box-item .del").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const bulto = btn.dataset.bulto;
+      const ts = btn.dataset.ts;
+      estado.registros[producto.codigo] = (estado.registros[producto.codigo]||[]).filter(r=>!(String(r.bulto)===bulto && r.timestamp===ts));
+      guardarEstado();
+      renderDetalle();
+    });
+  });
+
+  document.getElementById("btnRegistrar").addEventListener("click", ()=>{
+    const bultoRaw = document.getElementById("inpBulto").value.trim();
+    const unidadesRaw = document.getElementById("inpUnidades").value.trim();
+    const errEl = document.getElementById("formError");
+
+    const bulto = parseInt(bultoRaw, 10);
+    const unidades = parseInt(unidadesRaw, 10);
+
+    if(!bultoRaw || isNaN(bulto) || bulto < 1 || bulto > 999){
+      errEl.textContent = "Ingresa un número de bulto válido (1-999).";
+      errEl.style.display = "block";
+      return;
+    }
+    if(!unidadesRaw || isNaN(unidades) || unidades <= 0){
+      errEl.textContent = "Ingresa una cantidad de unidades mayor a 0.";
+      errEl.style.display = "block";
+      return;
+    }
+
+    if(!estado.registros[producto.codigo]) estado.registros[producto.codigo] = [];
+    const yaExiste = estado.registros[producto.codigo].some(r=> r.bulto === bulto);
+
+    const recibidoPrevio = unidadesRecibidas(producto.codigo);
+    estado.registros[producto.codigo].push({
+      bulto, unidades, timestamp: new Date().toISOString()
+    });
+    guardarEstado();
+
+    const recibidoNuevo = unidadesRecibidas(producto.codigo);
+    if(recibidoPrevio < producto.cantidadEsperada && recibidoNuevo >= producto.cantidadEsperada){
+      mensajeFlash = { tipo: "celebracion" };
+    } else {
+      mensajeFlash = { tipo: "ok", texto: `Bulto #${bulto} registrado (${unidades} unidades)${yaExiste ? " — bulto repetido" : ""}` };
+    }
+
+    renderDetalle();
+  });
+}
+
+function renderReporte(){
+  const {completos, parciales, pendientes, total} = contarEstados();
+
+  const todasCajas = [];
+  PRODUCTOS_FACTURA.forEach(p=>{
+    (estado.registros[p.codigo]||[]).forEach(c=>{
+      todasCajas.push({bulto:c.bulto, producto:p, unidades:c.unidades});
+    });
+  });
+  todasCajas.sort((a,b)=> a.bulto - b.bulto);
+
+  const faltantes = PRODUCTOS_FACTURA.filter(p=> unidadesRecibidas(p.codigo) === 0);
+  const incompletos = PRODUCTOS_FACTURA.filter(p=>{
+    const r = unidadesRecibidas(p.codigo);
+    return r > 0 && r < p.cantidadEsperada;
+  });
+  const excedentes = PRODUCTOS_FACTURA.filter(p=> unidadesRecibidas(p.codigo) > p.cantidadEsperada);
+
+  const tablaBultosHtml = todasCajas.length === 0
+    ? `<div class="empty-msg">Aún no hay bultos registrados.</div>`
+    : `<table class="report-table">
+        <thead><tr><th>#Bulto</th><th>Producto</th><th>Unidades</th></tr></thead>
+        <tbody>
+          ${todasCajas.map(c=>`<tr><td>${esc(c.bulto)}</td><td>${esc(c.producto.codigo)}</td><td>${esc(c.unidades)}</td></tr>`).join("")}
+        </tbody>
+      </table>`;
+
+  const faltantesHtml = faltantes.length===0 ? `<div class="empty-msg">Ninguno 🎉</div>` :
+    `<div class="report-list">${faltantes.map(p=>`<div class="item-line">• ${esc(p.codigo)} — ${esc(p.descripcion)}: 0/${p.cantidadEsperada}</div>`).join("")}</div>`;
+
+  const incompletosHtml = incompletos.length===0 ? `<div class="empty-msg">Ninguno 🎉</div>` :
+    `<div class="report-list">${incompletos.map(p=>{
+      const r = unidadesRecibidas(p.codigo);
+      return `<div class="item-line">• ${esc(p.codigo)} — ${esc(p.descripcion)}: ${r}/${p.cantidadEsperada} (faltan ${p.cantidadEsperada-r})</div>`;
+    }).join("")}</div>`;
+
+  const excedentesHtml = excedentes.length===0 ? `<div class="empty-msg">Ninguno</div>` :
+    `<div class="report-list">${excedentes.map(p=>{
+      const r = unidadesRecibidas(p.codigo);
+      return `<div class="item-line">• ${esc(p.codigo)} — ${esc(p.descripcion)}: ${r}/${p.cantidadEsperada} (excedente ${r-p.cantidadEsperada})</div>`;
+    }).join("")}</div>`;
+
+  appEl.innerHTML = `
+    ${renderHeader("Reporte final", null, true)}
+    <div class="container">
+      <div class="detail-header-card">
+        <div class="recibido-line">Total productos: ${total}</div>
+        <div>✅ Completos: ${completos} &nbsp; ⚠️ Parciales: ${parciales} &nbsp; ❌ Sin registrar: ${pendientes}</div>
+      </div>
+
+      <div class="section-title">Bultos registrados</div>
+      ${tablaBultosHtml}
+
+      <div class="section-title">🔴 Faltantes (0 unidades)</div>
+      ${faltantesHtml}
+
+      <div class="section-title">⚠️ Incompletos</div>
+      ${incompletosHtml}
+
+      <div class="section-title">📈 Excedentes</div>
+      ${excedentesHtml}
+
+      <button class="btn btn-secondary btn-block no-print" id="btnCopiar">📋 Copiar reporte para WhatsApp</button>
+      <button class="btn btn-primary btn-block no-print" id="btnPdf">🖨️ Guardar como PDF</button>
+      <div id="copiarMsg" class="confirm-flash" style="display:none;">✓ Reporte copiado al portapapeles</div>
+    </div>
+  `;
+
+  document.getElementById("btnBack").addEventListener("click", irALista);
+  document.getElementById("btnPdf").addEventListener("click", ()=> window.print());
+  document.getElementById("btnCopiar").addEventListener("click", async ()=>{
+    const texto = generarTextoWhatsApp(completos, parciales, pendientes, total, faltantes, incompletos);
+    try{
+      await navigator.clipboard.writeText(texto);
+    }catch(e){
+      const ta = document.createElement("textarea");
+      ta.value = texto; document.body.appendChild(ta); ta.select();
+      document.execCommand("copy"); document.body.removeChild(ta);
+    }
+    const msg = document.getElementById("copiarMsg");
+    msg.style.display = "block";
+    setTimeout(()=>{ msg.style.display = "none"; }, 2000);
+  });
+}
+
+function generarTextoWhatsApp(completos, parciales, pendientes, total, faltantes, incompletos){
+  const fecha = new Date().toLocaleDateString('es-VE');
+  let txt = `📦 RECEPCIÓN KM0 — ${fecha}\n`;
+  txt += `✅ Completos: ${completos}/${total}\n`;
+  txt += `⚠️ Parciales: ${parciales}/${total}\n`;
+  txt += `❌ Pendientes: ${pendientes}/${total}\n\n`;
+
+  txt += `🔴 FALTANTES:\n`;
+  if(faltantes.length === 0) txt += `• Ninguno\n`;
+  else faltantes.forEach(p=> txt += `• ${p.codigo} — ${p.descripcion}: 0/${p.cantidadEsperada}\n`);
+
+  txt += `\n⚠️ INCOMPLETOS:\n`;
+  if(incompletos.length === 0) txt += `• Ninguno\n`;
+  else incompletos.forEach(p=>{
+    const r = unidadesRecibidas(p.codigo);
+    txt += `• ${p.codigo} — ${p.descripcion}: ${r}/${p.cantidadEsperada} (faltan ${p.cantidadEsperada-r})\n`;
+  });
+
+  return txt;
+}
+
+function esc(str){
+  return String(str).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+}
+function escAttr(str){ return esc(str); }
+
+render();
+</script>
+</body>
+</html>
