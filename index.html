@@ -477,9 +477,10 @@ function renderDetalle(){
     ? `<div class="empty-msg">Todavía no se ha registrado ninguna caja.</div>`
     : cajas.map((c,idx)=>{
         const hora = new Date(c.timestamp).toLocaleTimeString('es-VE',{hour:'2-digit',minute:'2-digit'});
+        const bultoTexto = c.bulto === null ? "Paleta sin número" : `Bulto #${esc(c.bulto)}`;
         return `
           <div class="box-item">
-            <span>Bulto #${esc(c.bulto)} · ${esc(c.unidades)} unidades · ${hora}</span>
+            <span>${bultoTexto} · ${esc(c.unidades)} unidades · ${hora}</span>
             <button class="del" data-bulto="${escAttr(c.bulto)}" data-ts="${escAttr(c.timestamp)}">×</button>
           </div>
         `;
@@ -504,7 +505,7 @@ function renderDetalle(){
 
       <div class="form-card">
         <div class="section-title" style="margin-top:0;">Registrar nueva caja</div>
-        <label for="inpBulto"># Bulto</label>
+        <label for="inpBulto"># Bulto (deja vacío si es una paleta sin número)</label>
         <input type="text" inputmode="numeric" pattern="[0-9]*" id="inpBulto" placeholder="Ej: 47" maxlength="3">
         <label for="inpUnidades">Unidades en esta caja</label>
         <input type="text" inputmode="numeric" pattern="[0-9]*" id="inpUnidades" placeholder="Ej: 20" maxlength="5">
@@ -532,13 +533,16 @@ function renderDetalle(){
     const unidadesRaw = document.getElementById("inpUnidades").value.trim();
     const errEl = document.getElementById("formError");
 
-    const bulto = parseInt(bultoRaw, 10);
     const unidades = parseInt(unidadesRaw, 10);
+    let bulto = null;
 
-    if(!bultoRaw || isNaN(bulto) || bulto < 1 || bulto > 999){
-      errEl.textContent = "Ingresa un número de bulto válido (1-999).";
-      errEl.style.display = "block";
-      return;
+    if(bultoRaw){
+      bulto = parseInt(bultoRaw, 10);
+      if(isNaN(bulto) || bulto < 1 || bulto > 999){
+        errEl.textContent = "Ingresa un número de bulto válido (1-999), o deja el campo vacío si es una paleta sin número.";
+        errEl.style.display = "block";
+        return;
+      }
     }
     if(!unidadesRaw || isNaN(unidades) || unidades <= 0){
       errEl.textContent = "Ingresa una cantidad de unidades mayor a 0.";
@@ -547,7 +551,7 @@ function renderDetalle(){
     }
 
     if(!estado.registros[producto.codigo]) estado.registros[producto.codigo] = [];
-    const yaExiste = estado.registros[producto.codigo].some(r=> r.bulto === bulto);
+    const yaExiste = bulto !== null && estado.registros[producto.codigo].some(r=> r.bulto === bulto);
 
     const recibidoPrevio = unidadesRecibidas(producto.codigo);
     estado.registros[producto.codigo].push({
@@ -559,7 +563,8 @@ function renderDetalle(){
     if(recibidoPrevio < producto.cantidadEsperada && recibidoNuevo >= producto.cantidadEsperada){
       mensajeFlash = { tipo: "celebracion" };
     } else {
-      mensajeFlash = { tipo: "ok", texto: `Bulto #${bulto} registrado (${unidades} unidades)${yaExiste ? " — bulto repetido" : ""}` };
+      const bultoTexto = bulto === null ? "Paleta sin número" : `Bulto #${bulto}`;
+      mensajeFlash = { tipo: "ok", texto: `${bultoTexto} registrado (${unidades} unidades)${yaExiste ? " — bulto repetido" : ""}` };
     }
 
     renderDetalle();
@@ -575,7 +580,7 @@ function renderReporte(){
       todasCajas.push({bulto:c.bulto, producto:p, unidades:c.unidades});
     });
   });
-  todasCajas.sort((a,b)=> a.bulto - b.bulto);
+  todasCajas.sort((a,b)=> (a.bulto===null?Infinity:a.bulto) - (b.bulto===null?Infinity:b.bulto));
 
   const faltantes = PRODUCTOS_FACTURA.filter(p=> unidadesRecibidas(p.codigo) === 0);
   const incompletos = PRODUCTOS_FACTURA.filter(p=>{
@@ -592,7 +597,7 @@ function renderReporte(){
     : `<table class="report-table">
         <thead><tr><th>#Bulto</th><th>Producto</th><th>Unidades</th></tr></thead>
         <tbody>
-          ${todasCajas.map(c=>`<tr><td>${esc(c.bulto)}</td><td>${esc(c.producto.codigo)}</td><td>${esc(c.unidades)}</td></tr>`).join("")}
+          ${todasCajas.map(c=>`<tr><td>${c.bulto===null?"Paleta":esc(c.bulto)}</td><td>${esc(c.producto.codigo)}</td><td>${esc(c.unidades)}</td></tr>`).join("")}
         </tbody>
       </table>`;
 
