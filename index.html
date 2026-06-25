@@ -623,6 +623,8 @@ function renderReporte(){
   const totalBultosEsperados = parseInt(localStorage.getItem("km0_total_bultos_esperados"), 10) || 176;
   const totalBultosRegistrados = todasCajas.length;
 
+  const categoriasUnicas = [...new Set(PRODUCTOS_FACTURA.map(p=>p.categoria))].sort();
+
   const tablaBultosHtml = todasCajas.length === 0
     ? `<div class="empty-msg">Aún no hay bultos registrados.</div>`
     : `<table class="report-table">
@@ -671,6 +673,15 @@ function renderReporte(){
       <button class="btn btn-primary btn-block no-print" id="btnPdf">🖨️ Guardar como PDF</button>
       <div id="copiarMsg" class="confirm-flash" style="display:none;">✓ Reporte copiado al portapapeles</div>
 
+      <div class="section-title">Marcar categoría como completa</div>
+      <div class="form-card no-print">
+        <label for="selCategoriaCompletar">Categoría</label>
+        <select id="selCategoriaCompletar" style="width:100%; padding:10px; font-size:15px; border-radius:8px; border:1px solid #ccc;">
+          ${categoriasUnicas.map(c=>`<option value="${escAttr(c)}">${esc(c)}</option>`).join("")}
+        </select>
+        <button class="btn btn-primary btn-block" id="btnCompletarCategoria" style="margin-top:10px;">✅ Marcar categoría como completa</button>
+      </div>
+
       <div class="section-title">Conteo total de bultos</div>
       <div class="form-card no-print">
         <label for="totalBultosEsperados">Total de bultos esperados (todas las tandas)</label>
@@ -700,6 +711,24 @@ function renderReporte(){
     const msg = document.getElementById("copiarMsg");
     msg.style.display = "block";
     setTimeout(()=>{ msg.style.display = "none"; }, 2000);
+  });
+
+  document.getElementById("btnCompletarCategoria").addEventListener("click", ()=>{
+    const categoria = document.getElementById("selCategoriaCompletar").value;
+    const productosCategoria = PRODUCTOS_FACTURA.filter(p=> p.categoria === categoria);
+    let marcados = 0;
+    productosCategoria.forEach(p=>{
+      const recibido = unidadesRecibidas(p.codigo);
+      const faltante = p.cantidadEsperada - recibido;
+      if(faltante > 0){
+        if(!estado.registros[p.codigo]) estado.registros[p.codigo] = [];
+        estado.registros[p.codigo].push({ bulto: null, unidades: faltante, timestamp: new Date().toISOString() });
+        marcados++;
+      }
+    });
+    guardarEstado();
+    alert(`✓ ${marcados} referencia(s) de "${categoria}" marcadas como completas.`);
+    renderReporte();
   });
 
   function renderContadorBultos(){
