@@ -632,6 +632,16 @@ function renderReporte(){
       <button class="btn btn-primary btn-block no-print" id="btnPdf">🖨️ Guardar como PDF</button>
       <div id="copiarMsg" class="confirm-flash" style="display:none;">✓ Reporte copiado al portapapeles</div>
 
+      <div class="section-title">Verificar tanda de bultos</div>
+      <div class="form-card no-print">
+        <label for="tandaDesde">Desde el bulto #</label>
+        <input type="text" inputmode="numeric" pattern="[0-9]*" id="tandaDesde" placeholder="Ej: 1">
+        <label for="tandaHasta">Hasta el bulto #</label>
+        <input type="text" inputmode="numeric" pattern="[0-9]*" id="tandaHasta" placeholder="Ej: 20">
+        <button class="btn btn-primary btn-block" id="btnVerificarTanda">🔍 Verificar tanda</button>
+        <div id="tandaResultado" style="margin-top:12px;"></div>
+      </div>
+
       <div class="section-title">Respaldo de datos</div>
       <button class="btn btn-secondary btn-block no-print" id="btnExportar">⬇️ Exportar datos (JSON)</button>
       <button class="btn btn-secondary btn-block no-print" id="btnImportar">⬆️ Importar datos (JSON)</button>
@@ -656,7 +666,30 @@ function renderReporte(){
     setTimeout(()=>{ msg.style.display = "none"; }, 2000);
   });
 
-  document.getElementById("btnExportar").addEventListener("click", exportarDatos);
+  document.getElementById("btnVerificarTanda").addEventListener("click", ()=>{
+    const resEl = document.getElementById("tandaResultado");
+    const desde = parseInt(document.getElementById("tandaDesde").value, 10);
+    const hasta = parseInt(document.getElementById("tandaHasta").value, 10);
+    if(!Number.isInteger(desde) || !Number.isInteger(hasta) || desde < 1 || hasta < desde){
+      resEl.innerHTML = `<div class="warn-text">Ingresa un rango válido (ej. desde 1 hasta 20).</div>`;
+      return;
+    }
+    const usados = new Set();
+    Object.values(estado.registros).forEach(cajas=>{
+      cajas.forEach(c=> usados.add(c.bulto));
+    });
+    const faltan = [];
+    for(let n = desde; n <= hasta; n++){
+      if(!usados.has(n)) faltan.push(n);
+    }
+    const totalRango = hasta - desde + 1;
+    const encontrados = totalRango - faltan.length;
+    if(faltan.length === 0){
+      resEl.innerHTML = `<div class="empty-msg" style="color:var(--verde);">✅ Tanda completa: del bulto ${desde} al ${hasta} (${totalRango} cajas) ya están todas registradas.</div>`;
+    }else{
+      resEl.innerHTML = `<div class="warn-text">⚠️ ${encontrados} de ${totalRango} registrados. Faltan los bultos: ${faltan.join(", ")}</div>`;
+    }
+  });
 
   const inputImportar = document.getElementById("inputImportar");
   document.getElementById("btnImportar").addEventListener("click", ()=> inputImportar.click());
