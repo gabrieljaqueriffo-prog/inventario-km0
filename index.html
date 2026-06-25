@@ -389,7 +389,7 @@ function renderLista(){
   if(textoBusqueda.trim()){
     const q = normalizar(textoBusqueda);
     productos = productos.filter(p =>
-      normalizar(p.codigo).includes(q) || normalizar(p.descripcion).includes(q)
+      normalizar(p.codigo).includes(q) || normalizar(p.descripcion).includes(q) || normalizar(p.marca).includes(q)
     );
   }
 
@@ -399,6 +399,14 @@ function renderLista(){
 
   const ordenPrioridad = {pendiente:0, parcial:1, completo:2};
   productos.sort((a,b)=> ordenPrioridad[estadoProducto(a)] - ordenPrioridad[estadoProducto(b)]);
+
+  let resumenBusquedaHtml = "";
+  if(textoBusqueda.trim()){
+    const completosF = productos.filter(p=> estadoProducto(p)==="completo").length;
+    const parcialesF = productos.filter(p=> estadoProducto(p)==="parcial").length;
+    const pendientesF = productos.filter(p=> estadoProducto(p)==="pendiente").length;
+    resumenBusquedaHtml = `<div class="empty-msg" style="text-align:left;">🔎 ${productos.length} resultado(s): ✅ ${completosF} completos · ⚠️ ${parcialesF} parciales · ❌ ${pendientesF} pendientes</div>`;
+  }
 
   const itemsHtml = productos.length === 0
     ? `<div class="empty-msg">No se encontraron productos.</div>`
@@ -439,6 +447,7 @@ function renderLista(){
         <button class="filter-btn ${filtroActivo==='parcial'?'active':''}" data-filtro="parcial">Parciales</button>
         <button class="filter-btn ${filtroActivo==='completo'?'active':''}" data-filtro="completo">Completos</button>
       </div>
+      ${resumenBusquedaHtml}
       <div class="product-list">${itemsHtml}</div>
       <button class="btn btn-primary btn-block no-print" id="btnReporte">📋 Ver reporte final</button>
     </div>
