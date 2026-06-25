@@ -343,6 +343,7 @@ let vista = "lista"; // lista | detalle | reporte
 let productoActual = null; // codigo
 let filtroActivo = "todos";
 let textoBusqueda = "";
+let tecladoBuscadorNumerico = true;
 
 function irALista(){ vista="lista"; productoActual=null; render(); }
 function irADetalle(codigo){ vista="detalle"; productoActual=codigo; render(); }
@@ -438,8 +439,9 @@ function renderLista(){
         <div class="stat-card parciales"><div class="num">${parciales}</div><div class="lbl">⚠️ Parciales</div></div>
         <div class="stat-card pendientes"><div class="num">${pendientes}</div><div class="lbl">❌ Sin registrar</div></div>
       </div>
-      <div class="search-box">
-        <input type="text" id="buscador" placeholder="Buscar por código o descripción..." value="${escAttr(textoBusqueda)}">
+      <div class="search-box" style="display:flex; gap:8px; align-items:center;">
+        <input type="text" id="buscador" inputmode="${tecladoBuscadorNumerico ? "numeric" : "text"}" placeholder="Buscar por código o descripción..." value="${escAttr(textoBusqueda)}" style="flex:1;">
+        <button class="btn btn-secondary no-print" id="btnToggleTeclado" type="button" style="width:56px; flex-shrink:0; padding:0;">${tecladoBuscadorNumerico ? "123" : "ABC"}</button>
       </div>
       <div class="filters">
         <button class="filter-btn ${filtroActivo==='todos'?'active':''}" data-filtro="todos">Todos</button>
@@ -459,6 +461,14 @@ function renderLista(){
     document.getElementById("buscador").focus();
     const val = document.getElementById("buscador").value;
     document.getElementById("buscador").setSelectionRange(val.length, val.length);
+  });
+
+  document.getElementById("btnToggleTeclado").addEventListener("click", ()=>{
+    tecladoBuscadorNumerico = !tecladoBuscadorNumerico;
+    renderLista();
+    const input = document.getElementById("buscador");
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
   });
   document.querySelectorAll(".filter-btn").forEach(b=>{
     b.addEventListener("click", ()=>{ filtroActivo = b.dataset.filtro; renderLista(); });
