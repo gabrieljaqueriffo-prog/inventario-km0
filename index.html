@@ -584,6 +584,9 @@ function renderReporte(){
   });
   const excedentes = PRODUCTOS_FACTURA.filter(p=> unidadesRecibidas(p.codigo) > p.cantidadEsperada);
 
+  const totalBultosEsperados = parseInt(localStorage.getItem("km0_total_bultos_esperados"), 10) || 176;
+  const totalBultosRegistrados = todasCajas.length;
+
   const tablaBultosHtml = todasCajas.length === 0
     ? `<div class="empty-msg">Aún no hay bultos registrados.</div>`
     : `<table class="report-table">
@@ -632,14 +635,11 @@ function renderReporte(){
       <button class="btn btn-primary btn-block no-print" id="btnPdf">🖨️ Guardar como PDF</button>
       <div id="copiarMsg" class="confirm-flash" style="display:none;">✓ Reporte copiado al portapapeles</div>
 
-      <div class="section-title">Verificar tanda de bultos</div>
+      <div class="section-title">Conteo total de bultos</div>
       <div class="form-card no-print">
-        <label for="tandaDesde">Desde el bulto #</label>
-        <input type="text" inputmode="numeric" pattern="[0-9]*" id="tandaDesde" placeholder="Ej: 1">
-        <label for="tandaHasta">Hasta el bulto #</label>
-        <input type="text" inputmode="numeric" pattern="[0-9]*" id="tandaHasta" placeholder="Ej: 20">
-        <button class="btn btn-primary btn-block" id="btnVerificarTanda">🔍 Verificar tanda</button>
-        <div id="tandaResultado" style="margin-top:12px;"></div>
+        <label for="totalBultosEsperados">Total de bultos esperados (todas las tandas)</label>
+        <input type="text" inputmode="numeric" pattern="[0-9]*" id="totalBultosEsperados" value="${totalBultosEsperados}">
+        <div id="contadorBultosResultado" style="margin-top:12px;"></div>
       </div>
 
       <div class="section-title">Respaldo de datos</div>
@@ -666,29 +666,22 @@ function renderReporte(){
     setTimeout(()=>{ msg.style.display = "none"; }, 2000);
   });
 
-  document.getElementById("btnVerificarTanda").addEventListener("click", ()=>{
-    const resEl = document.getElementById("tandaResultado");
-    const desde = parseInt(document.getElementById("tandaDesde").value, 10);
-    const hasta = parseInt(document.getElementById("tandaHasta").value, 10);
-    if(!Number.isInteger(desde) || !Number.isInteger(hasta) || desde < 1 || hasta < desde){
-      resEl.innerHTML = `<div class="warn-text">Ingresa un rango válido (ej. desde 1 hasta 20).</div>`;
-      return;
-    }
-    const usados = new Set();
-    Object.values(estado.registros).forEach(cajas=>{
-      cajas.forEach(c=> usados.add(c.bulto));
-    });
-    const faltan = [];
-    for(let n = desde; n <= hasta; n++){
-      if(!usados.has(n)) faltan.push(n);
-    }
-    const totalRango = hasta - desde + 1;
-    const encontrados = totalRango - faltan.length;
-    if(faltan.length === 0){
-      resEl.innerHTML = `<div class="empty-msg" style="color:var(--verde);">✅ Tanda completa: del bulto ${desde} al ${hasta} (${totalRango} cajas) ya están todas registradas.</div>`;
+  function renderContadorBultos(){
+    const resEl = document.getElementById("contadorBultosResultado");
+    const meta = parseInt(document.getElementById("totalBultosEsperados").value, 10) || 0;
+    const faltan = meta - totalBultosRegistrados;
+    if(meta > 0 && faltan <= 0){
+      resEl.innerHTML = `<div class="empty-msg" style="color:var(--verde);">✅ ${totalBultosRegistrados} de ${meta} bultos registrados. ¡Tanda completa!</div>`;
+    }else if(meta > 0){
+      resEl.innerHTML = `<div class="warn-text">📦 ${totalBultosRegistrados} de ${meta} bultos registrados. Faltan ${faltan}.</div>`;
     }else{
-      resEl.innerHTML = `<div class="warn-text">⚠️ ${encontrados} de ${totalRango} registrados. Faltan los bultos: ${faltan.join(", ")}</div>`;
+      resEl.innerHTML = `<div class="empty-msg">📦 ${totalBultosRegistrados} bultos registrados.</div>`;
     }
+  }
+  renderContadorBultos();
+  document.getElementById("totalBultosEsperados").addEventListener("input", (e)=>{
+    localStorage.setItem("km0_total_bultos_esperados", e.target.value);
+    renderContadorBultos();
   });
 
   const inputImportar = document.getElementById("inputImportar");
