@@ -381,10 +381,7 @@ function contarEstados(){
   return {completos, parciales, pendientes, total: PRODUCTOS_FACTURA.length};
 }
 
-function renderLista(){
-  const {completos, parciales, pendientes, total} = contarEstados();
-  const pct = total ? Math.round((completos/total)*100) : 0;
-
+function calcularResultadosLista(){
   let productos = PRODUCTOS_FACTURA.slice();
 
   if(textoBusqueda.trim()){
@@ -427,6 +424,22 @@ function renderLista(){
         `;
       }).join("");
 
+  return resumenBusquedaHtml + `<div class="product-list">${itemsHtml}</div>`;
+}
+
+function actualizarResultadosLista(){
+  const cont = document.getElementById("resultadosLista");
+  if(!cont) return;
+  cont.innerHTML = calcularResultadosLista();
+  cont.querySelectorAll(".product-item").forEach(item=>{
+    item.addEventListener("click", ()=> irADetalle(item.dataset.codigo));
+  });
+}
+
+function renderLista(){
+  const {completos, parciales, pendientes, total} = contarEstados();
+  const pct = total ? Math.round((completos/total)*100) : 0;
+
   appEl.innerHTML = `
     ${renderHeader("KM0 — Recepción de Inventario")}
     <div class="container">
@@ -449,32 +462,31 @@ function renderLista(){
         <button class="filter-btn ${filtroActivo==='parcial'?'active':''}" data-filtro="parcial">Parciales</button>
         <button class="filter-btn ${filtroActivo==='completo'?'active':''}" data-filtro="completo">Completos</button>
       </div>
-      ${resumenBusquedaHtml}
-      <div class="product-list">${itemsHtml}</div>
+      <div id="resultadosLista">${calcularResultadosLista()}</div>
       <button class="btn btn-primary btn-block no-print" id="btnReporte">📋 Ver reporte final</button>
     </div>
   `;
 
+  document.querySelectorAll("#resultadosLista .product-item").forEach(item=>{
+    item.addEventListener("click", ()=> irADetalle(item.dataset.codigo));
+  });
+
   document.getElementById("buscador").addEventListener("input", e=>{
     textoBusqueda = e.target.value;
-    renderLista();
-    document.getElementById("buscador").focus();
-    const val = document.getElementById("buscador").value;
-    document.getElementById("buscador").setSelectionRange(val.length, val.length);
+    actualizarResultadosLista();
   });
 
   document.getElementById("btnToggleTeclado").addEventListener("click", ()=>{
     tecladoBuscadorNumerico = !tecladoBuscadorNumerico;
-    renderLista();
     const input = document.getElementById("buscador");
+    input.setAttribute("inputmode", tecladoBuscadorNumerico ? "numeric" : "text");
+    document.getElementById("btnToggleTeclado").textContent = tecladoBuscadorNumerico ? "123" : "ABC";
+    input.blur();
     input.focus();
     input.setSelectionRange(input.value.length, input.value.length);
   });
   document.querySelectorAll(".filter-btn").forEach(b=>{
     b.addEventListener("click", ()=>{ filtroActivo = b.dataset.filtro; renderLista(); });
-  });
-  document.querySelectorAll(".product-item").forEach(item=>{
-    item.addEventListener("click", ()=> irADetalle(item.dataset.codigo));
   });
   document.getElementById("btnReporte").addEventListener("click", irAReporte);
 }
