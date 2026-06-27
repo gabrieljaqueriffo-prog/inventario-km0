@@ -339,15 +339,20 @@ function estadoProducto(producto){
 }
 
 // ---------- Routing / state ----------
-let vista = "lista"; // lista | detalle | reporte
+let vista = "lista"; // lista | detalle | reporte | organizar | organizarDetalle | organizarPaleta
 let productoActual = null; // codigo
 let filtroActivo = "todos";
 let textoBusqueda = "";
 let tecladoBuscadorNumerico = true;
+let textoBusquedaOrganizar = "";
+let paletaSeleccionada = 1;
 
 function irALista(){ vista="lista"; productoActual=null; render(); }
 function irADetalle(codigo){ vista="detalle"; productoActual=codigo; render(); }
 function irAReporte(){ vista="reporte"; render(); }
+function irAOrganizar(){ vista="organizar"; productoActual=null; render(); }
+function irAOrganizarDetalle(codigo){ vista="organizarDetalle"; productoActual=codigo; render(); }
+function irAOrganizarPaleta(){ vista="organizarPaleta"; render(); }
 
 // ---------- Render ----------
 const appEl = document.getElementById("app");
@@ -356,6 +361,15 @@ function render(){
   if(vista === "lista") renderLista();
   else if(vista === "detalle") renderDetalle();
   else if(vista === "reporte") renderReporte();
+  else if(vista === "organizar") renderOrganizar();
+  else if(vista === "organizarDetalle") renderOrganizarDetalle();
+  else if(vista === "organizarPaleta") renderOrganizarPaleta();
+}
+
+function paletasDeProducto(codigo){
+  const regs = estado.registros[codigo] || [];
+  const set = new Set(regs.filter(r=> r.paleta != null).map(r=> r.paleta));
+  return [...set].sort((a,b)=> a-b);
 }
 
 function renderHeader(titulo, subtitulo, conBack, accionBack){
@@ -464,6 +478,7 @@ function renderLista(){
       </div>
       <div id="resultadosLista">${calcularResultadosLista()}</div>
       <button class="btn btn-primary btn-block no-print" id="btnReporte">📋 Ver reporte final</button>
+      <button class="btn btn-secondary btn-block no-print" id="btnOrganizar" style="margin-top:8px;">📦 Organizar en paletas</button>
     </div>
   `;
 
@@ -489,6 +504,181 @@ function renderLista(){
     b.addEventListener("click", ()=>{ filtroActivo = b.dataset.filtro; renderLista(); });
   });
   document.getElementById("btnReporte").addEventListener("click", irAReporte);
+  document.getElementById("btnOrganizar").addEventListener("click", irAOrganizar);
+}
+
+function calcularResultadosOrganizar(){
+  let productos = PRODUCTOS_FACTURA.filter(p=> (estado.registros[p.codigo]||[]).length > 0);
+
+  if(textoBusquedaOrganizar.trim()){
+    const q = normalizar(textoBusquedaOrganizar);
+    productos = productos.filter(p =>
+      normalizar(p.codigo).includes(q) || normalizar(p.descripcion).includes(q) || normalizar(p.marca).includes(q)
+    );
+  }
+
+  productos.sort((a,b)=> a.codigo.localeCompare(b.codigo));
+
+  if(productos.length === 0){
+    return `<div class="empty-msg">No se encontraron referencias con bultos registrados.</div>`;
+  }
+
+  return `<div class="product-list">${productos.map(p=>{
+    const regs = estado.registros[p.codigo] || [];
+    const paletas = paletasDeProducto(p.codigo);
+    let badge;
+    if(paletas.length === 0) badge = `<span class="chip pendiente">SIN ASIGNAR</span>`;
+    else if(paletas.length === 1) badge = `<span class="chip completo">PALETA ${paletas[0]}</span>`;
+    else badge = `<span class="chip parcial">PALETAS ${paletas.join(", ")}</span>`;
+    return `
+      <div class="product-item" data-codigo="${escAttr(p.codigo)}">
+        <div class="info">
+          <div class="codigo">${esc(p.codigo)}</div>
+          <div class="desc">${esc(p.descripcion)}</div>
+          <div class="meta">${esc(p.marca)} · ${regs.length} bulto(s)</div>
+        </div>
+        ${badge}
+      </div>
+    `;
+  }).join("")}</div>`;
+}
+
+function actualizarResultadosOrganizar(){
+  const cont = document.getElementById("resultadosOrganizar");
+  if(!cont) return;
+  cont.innerHTML = calcularResultadosOrganizar();
+  cont.querySelectorAll(".product-item").forEach(item=>{
+    item.addEventListener("click", ()=> irAOrganizarDetalle(item.dataset.codigo));
+  });
+}
+
+function renderOrganizar(){
+  appEl.innerHTML = `
+    ${renderHeader("Organizar en Paletas", "Busca una referencia y asígnale paleta", true, irALista)}
+    <div class="container">
+      <div class="search-box" style="display:flex; gap:8px; align-items:center;">
+        <input type="text" id="buscadorOrganizar" inputmode="text" placeholder="Buscar por código, descripción o marca..." value="${escAttr(textoBusquedaOrganizar)}" style="flex:1;">
+      </div>
+      <button class="btn btn-secondary btn-block no-print" id="btnVerPaletas" style="margin-bottom:12px;">🗂️ Ver contenido por paleta</button>
+      <div id="resultadosOrganizar">${calcularResultadosOrganizar()}</div>
+    </div>
+  `;
+
+  document.querySelectorAll("#resultadosOrganizar .product-item").forEach(item=>{
+    item.addEventListener("click", ()=> irAOrganizarDetalle(item.dataset.codigo));
+  });
+
+  document.getElementById("buscadorOrganizar").addEventListener("input", e=>{
+    textoBusquedaOrganizar = e.target.value;
+    actualizarResultadosOrganizar();
+  });
+
+  document.getElementById("btnVerPaletas").addEventListener("click", irAOrganizarPaleta);
+  document.getElementById("btnBack").addEventListener("click", irALista);
+}
+
+function renderOrganizarDetalle(){
+  const producto = PRODUCTOS_FACTURA.find(p=>p.codigo===productoActual);
+  if(!producto){ irAOrganizar(); return; }
+
+  const regs = estado.registros[producto.codigo] || [];
+
+  appEl.innerHTML = `
+    ${renderHeader(esc(producto.codigo), esc(producto.descripcion), true)}
+    <div class="container">
+      <div class="form-card">
+        <label for="inpPaletaTodos">Asignar la misma paleta a todos los bultos de esta referencia</label>
+        <div style="display:flex; gap:8px;">
+          <input type="text" inputmode="numeric" pattern="[0-9]*" id="inpPaletaTodos" placeholder="1-10" style="flex:1;">
+          <button class="btn btn-primary" id="btnAsignarTodos" style="flex-shrink:0;">Asignar a todos</button>
+        </div>
+      </div>
+      <div class="section-title">Bultos de esta referencia (${regs.length})</div>
+      <div class="product-list">
+        ${regs.map((r, idx)=>{
+          const bultoTexto = r.bulto === null ? "Paleta sin número" : `Bulto #${esc(r.bulto)}`;
+          return `
+            <div class="product-item">
+              <div class="info">
+                <div class="codigo">${bultoTexto}</div>
+                <div class="meta">${esc(r.unidades)} unidades</div>
+              </div>
+              <input type="text" inputmode="numeric" pattern="[0-9]*" class="inp-paleta-caja" data-idx="${idx}" placeholder="Paleta" value="${r.paleta != null ? esc(r.paleta) : ""}" style="width:70px; text-align:center; padding:8px; font-size:15px; border-radius:8px; border:1px solid #ccc;">
+            </div>
+          `;
+        }).join("")}
+      </div>
+    </div>
+  `;
+
+  document.getElementById("btnBack").addEventListener("click", irAOrganizar);
+
+  document.querySelectorAll(".inp-paleta-caja").forEach(inp=>{
+    inp.addEventListener("change", (e)=>{
+      const idx = parseInt(e.target.dataset.idx, 10);
+      const val = e.target.value.trim();
+      const paleta = val ? parseInt(val, 10) : null;
+      regs[idx].paleta = (paleta && paleta >= 1 && paleta <= 10) ? paleta : null;
+      guardarEstado();
+    });
+  });
+
+  document.getElementById("btnAsignarTodos").addEventListener("click", ()=>{
+    const val = document.getElementById("inpPaletaTodos").value.trim();
+    const paleta = parseInt(val, 10);
+    if(isNaN(paleta) || paleta < 1 || paleta > 10){
+      alert("Ingresa un número de paleta válido (1-10).");
+      return;
+    }
+    regs.forEach(r=> r.paleta = paleta);
+    guardarEstado();
+    renderOrganizarDetalle();
+  });
+}
+
+function renderOrganizarPaleta(){
+  const cajas = [];
+  PRODUCTOS_FACTURA.forEach(p=>{
+    (estado.registros[p.codigo]||[]).forEach(r=>{
+      if(r.paleta === paletaSeleccionada) cajas.push({producto:p, registro:r});
+    });
+  });
+  cajas.sort((a,b)=> a.producto.codigo.localeCompare(b.producto.codigo));
+  const totalUnidades = cajas.reduce((s,c)=> s+c.registro.unidades, 0);
+
+  appEl.innerHTML = `
+    ${renderHeader("Contenido por Paleta", null, true)}
+    <div class="container">
+      <div class="filters" style="flex-wrap:wrap;">
+        ${Array.from({length:10}, (_,i)=> i+1).map(n=>`
+          <button class="filter-btn ${paletaSeleccionada===n?'active':''}" data-paleta="${n}">Paleta ${n}</button>
+        `).join("")}
+      </div>
+      <div class="empty-msg" style="text-align:left;">📦 ${cajas.length} bulto(s) · ${totalUnidades} unidades en la Paleta ${paletaSeleccionada}</div>
+      <div class="product-list">
+        ${cajas.length === 0 ? `<div class="empty-msg">Esta paleta no tiene bultos asignados.</div>` : cajas.map(c=>{
+          const bultoTexto = c.registro.bulto === null ? "Paleta sin número" : `Bulto #${esc(c.registro.bulto)}`;
+          return `
+            <div class="product-item" data-codigo="${escAttr(c.producto.codigo)}">
+              <div class="info">
+                <div class="codigo">${esc(c.producto.codigo)}</div>
+                <div class="desc">${esc(c.producto.descripcion)}</div>
+                <div class="meta">${bultoTexto} · ${esc(c.registro.unidades)} unidades</div>
+              </div>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    </div>
+  `;
+
+  document.getElementById("btnBack").addEventListener("click", irAOrganizar);
+  document.querySelectorAll(".filter-btn").forEach(b=>{
+    b.addEventListener("click", ()=>{ paletaSeleccionada = parseInt(b.dataset.paleta, 10); renderOrganizarPaleta(); });
+  });
+  document.querySelectorAll(".product-list .product-item[data-codigo]").forEach(item=>{
+    item.addEventListener("click", ()=> irAOrganizarDetalle(item.dataset.codigo));
+  });
 }
 
 let mensajeFlash = null; // {tipo:'ok'|'celebracion', texto}
