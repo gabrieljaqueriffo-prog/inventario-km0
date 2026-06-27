@@ -22,7 +22,21 @@
     color:var(--gris);
     -webkit-tap-highlight-color:transparent;
   }
-  #app{max-width:480px;margin:0 auto;min-height:100vh;background:var(--blanco);position:relative;padding-bottom:24px;}
+  #app{max-width:480px;margin:0 auto;min-height:100vh;background:var(--blanco);position:relative;padding-bottom:84px;}
+
+  .bottom-nav{
+    position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;
+    display:flex;background:var(--blanco);box-shadow:0 -2px 10px rgba(0,0,0,.12);
+    z-index:60;padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px));
+  }
+  .bottom-nav button{
+    flex:1;background:none;border:none;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:2px;padding:6px 2px;
+    font-size:10.5px;font-weight:700;color:var(--gris);
+  }
+  .bottom-nav button.active{color:var(--rojo);}
+  .bottom-nav .icon{font-size:19px;}
+  @media print{ .bottom-nav{display:none !important;} }
 
   header.topbar{
     position:sticky;top:0;z-index:50;
@@ -63,6 +77,7 @@
   .stat-card.completos{background:#ecfdf3;color:#15803d;}
   .stat-card.parciales{background:#fffbeb;color:#b45309;}
   .stat-card.pendientes{background:#fef2f2;color:#b91c1c;}
+  .stat-card.no_llego{background:#f3f4f6;color:#52525b;}
 
   input[type="text"], input[type="number"], input[inputmode="numeric"]{
     width:100%;height:48px;border-radius:8px;border:1px solid #d4d4d8;
@@ -89,6 +104,7 @@
   .product-item.completo{border-left-color:var(--verde);}
   .product-item.parcial{border-left-color:var(--amarillo);}
   .product-item.pendiente{border-left-color:var(--rojo-pend);}
+  .product-item.no_llego{border-left-color:#9ca3af;opacity:.75;}
   .product-item .info{flex:1;min-width:0;}
   .product-item .codigo{font-weight:700;font-size:13px;color:var(--rojo-oscuro);}
   .product-item .desc{font-size:12px;color:var(--gris);
@@ -101,6 +117,7 @@
   .chip.completo{background:var(--verde);}
   .chip.parcial{background:var(--amarillo);}
   .chip.pendiente{background:var(--rojo-pend);}
+  .chip.no_llego{background:#9ca3af;}
 
   .btn{
     min-height:48px;border-radius:8px;border:none;font-size:15px;font-weight:700;
@@ -307,11 +324,14 @@ function cargarEstado(){
     const raw = localStorage.getItem(STORAGE_KEY);
     if(raw){
       const parsed = JSON.parse(raw);
-      if(parsed && parsed.registros) return parsed;
+      if(parsed && parsed.registros){
+        if(!parsed.noLlegaron) parsed.noLlegaron = {};
+        return parsed;
+      }
     }
   }catch(e){}
   const ahora = new Date().toISOString();
-  return { sesion_id: ahora.slice(0,10), fecha_inicio: ahora, fecha_ultima_actualizacion: ahora, registros: {} };
+  return { sesion_id: ahora.slice(0,10), fecha_inicio: ahora, fecha_ultima_actualizacion: ahora, registros: {}, noLlegaron: {} };
 }
 
 let estado = cargarEstado();
@@ -333,26 +353,54 @@ function unidadesRecibidas(codigo){
 
 function estadoProducto(producto){
   const recibido = unidadesRecibidas(producto.codigo);
-  if(recibido <= 0) return "pendiente";
+  if(recibido <= 0){
+    if(estado.noLlegaron[producto.codigo]) return "no_llego";
+    return "pendiente";
+  }
   if(recibido >= producto.cantidadEsperada) return "completo";
   return "parcial";
 }
 
+function marcarNoLlego(codigo){
+  estado.noLlegaron[codigo] = { timestamp: new Date().toISOString() };
+  guardarEstado();
+}
+
+function quitarNoLlego(codigo){
+  delete estado.noLlegaron[codigo];
+  guardarEstado();
+}
+
 // ---------- Routing / state ----------
-let vista = "lista"; // lista | detalle | reporte | organizar | organizarDetalle | organizarPaleta
-let productoActual = null; // codigo
+const VISTA_KEY = "km0_vista_actual";
+
+function cargarVistaGuardada(){
+  try{
+    const raw = localStorage.getItem(VISTA_KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  return null;
+}
+const vistaGuardada = cargarVistaGuardada();
+
+let vista = (vistaGuardada && vistaGuardada.vista) || "lista"; // lista | detalle | reporte | organizar | organizarDetalle | organizarPaleta
+let productoActual = (vistaGuardada && vistaGuardada.productoActual) || null; // codigo
 let filtroActivo = "todos";
 let textoBusqueda = "";
 let tecladoBuscadorNumerico = true;
 let textoBusquedaOrganizar = "";
-let paletaSeleccionada = 1;
+let paletaSeleccionada = (vistaGuardada && vistaGuardada.paletaSeleccionada) || 1;
 
-function irALista(){ vista="lista"; productoActual=null; render(); }
-function irADetalle(codigo){ vista="detalle"; productoActual=codigo; render(); }
-function irAReporte(){ vista="reporte"; render(); }
-function irAOrganizar(){ vista="organizar"; productoActual=null; render(); }
-function irAOrganizarDetalle(codigo){ vista="organizarDetalle"; productoActual=codigo; render(); }
-function irAOrganizarPaleta(){ vista="organizarPaleta"; render(); }
+function guardarVista(){
+  localStorage.setItem(VISTA_KEY, JSON.stringify({ vista, productoActual, paletaSeleccionada }));
+}
+
+function irALista(){ vista="lista"; productoActual=null; guardarVista(); render(); }
+function irADetalle(codigo){ vista="detalle"; productoActual=codigo; guardarVista(); render(); }
+function irAReporte(){ vista="reporte"; guardarVista(); render(); }
+function irAOrganizar(){ vista="organizar"; productoActual=null; guardarVista(); render(); }
+function irAOrganizarDetalle(codigo){ vista="organizarDetalle"; productoActual=codigo; guardarVista(); render(); }
+function irAOrganizarPaleta(){ vista="organizarPaleta"; guardarVista(); render(); }
 
 // ---------- Render ----------
 const appEl = document.getElementById("app");
@@ -364,6 +412,16 @@ function render(){
   else if(vista === "organizar") renderOrganizar();
   else if(vista === "organizarDetalle") renderOrganizarDetalle();
   else if(vista === "organizarPaleta") renderOrganizarPaleta();
+}
+
+function renderBottomNav(active){
+  const tabs = [
+    {id:"lista", icon:"📋", label:"Lista"},
+    {id:"organizar", icon:"📦", label:"Paletas"},
+    {id:"reporte", icon:"📊", label:"Reporte"},
+    {id:"exportar", icon:"⬇️", label:"Exportar"},
+  ];
+  return `<nav class="bottom-nav no-print">${tabs.map(t=>`<button data-nav="${t.id}" class="${active===t.id?'active':''}"><span class="icon">${t.icon}</span>${t.label}</button>`).join("")}</nav>`;
 }
 
 function paletasDeProducto(codigo){
@@ -385,14 +443,15 @@ function renderHeader(titulo, subtitulo, conBack, accionBack){
 }
 
 function contarEstados(){
-  let completos=0, parciales=0, pendientes=0;
+  let completos=0, parciales=0, pendientes=0, noLlegaron=0;
   PRODUCTOS_FACTURA.forEach(p=>{
     const e = estadoProducto(p);
     if(e==="completo") completos++;
     else if(e==="parcial") parciales++;
+    else if(e==="no_llego") noLlegaron++;
     else pendientes++;
   });
-  return {completos, parciales, pendientes, total: PRODUCTOS_FACTURA.length};
+  return {completos, parciales, pendientes, noLlegaron, total: PRODUCTOS_FACTURA.length};
 }
 
 function calcularResultadosLista(){
@@ -409,7 +468,7 @@ function calcularResultadosLista(){
     productos = productos.filter(p => estadoProducto(p) === filtroActivo);
   }
 
-  const ordenPrioridad = {pendiente:0, parcial:1, completo:2};
+  const ordenPrioridad = {pendiente:0, parcial:1, completo:2, no_llego:3};
   productos.sort((a,b)=> ordenPrioridad[estadoProducto(a)] - ordenPrioridad[estadoProducto(b)]);
 
   let resumenBusquedaHtml = "";
@@ -417,7 +476,8 @@ function calcularResultadosLista(){
     const completosF = productos.filter(p=> estadoProducto(p)==="completo").length;
     const parcialesF = productos.filter(p=> estadoProducto(p)==="parcial").length;
     const pendientesF = productos.filter(p=> estadoProducto(p)==="pendiente").length;
-    resumenBusquedaHtml = `<div class="empty-msg" style="text-align:left;">🔎 ${productos.length} resultado(s): ✅ ${completosF} completos · ⚠️ ${parcialesF} parciales · ❌ ${pendientesF} pendientes</div>`;
+    const noLlegaronF = productos.filter(p=> estadoProducto(p)==="no_llego").length;
+    resumenBusquedaHtml = `<div class="empty-msg" style="text-align:left;">🔎 ${productos.length} resultado(s): ✅ ${completosF} completos · ⚠️ ${parcialesF} parciales · ❌ ${pendientesF} pendientes · 🚫 ${noLlegaronF} no llegaron</div>`;
   }
 
   const itemsHtml = productos.length === 0
@@ -425,7 +485,7 @@ function calcularResultadosLista(){
     : productos.map(p=>{
         const recibido = unidadesRecibidas(p.codigo);
         const est = estadoProducto(p);
-        const labelEstado = est==="completo"?"COMPLETO":est==="parcial"?"PARCIAL":"PENDIENTE";
+        const labelEstado = est==="completo"?"COMPLETO":est==="parcial"?"PARCIAL":est==="no_llego"?"NO LLEGÓ":"PENDIENTE";
         return `
           <div class="product-item ${est}" data-codigo="${escAttr(p.codigo)}">
             <div class="info">
@@ -451,20 +511,22 @@ function actualizarResultadosLista(){
 }
 
 function renderLista(){
-  const {completos, parciales, pendientes, total} = contarEstados();
-  const pct = total ? Math.round((completos/total)*100) : 0;
+  const {completos, parciales, pendientes, noLlegaron, total} = contarEstados();
+  const totalActivo = total - noLlegaron;
+  const pct = totalActivo ? Math.round((completos/totalActivo)*100) : 0;
 
   appEl.innerHTML = `
     ${renderHeader("KM0 — Recepción de Inventario")}
     <div class="container">
       <div class="progress-wrap">
-        <div class="progress-label">${completos} de ${total} productos completados (${pct}%)</div>
+        <div class="progress-label">${completos} de ${totalActivo} productos completados (${pct}%)</div>
         <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
       </div>
       <div class="cards-row">
         <div class="stat-card completos"><div class="num">${completos}</div><div class="lbl">✅ Completos</div></div>
         <div class="stat-card parciales"><div class="num">${parciales}</div><div class="lbl">⚠️ Parciales</div></div>
         <div class="stat-card pendientes"><div class="num">${pendientes}</div><div class="lbl">❌ Sin registrar</div></div>
+        <div class="stat-card no_llego"><div class="num">${noLlegaron}</div><div class="lbl">🚫 No llegó</div></div>
       </div>
       <div class="search-box" style="display:flex; gap:8px; align-items:center;">
         <input type="text" id="buscador" inputmode="${tecladoBuscadorNumerico ? "numeric" : "text"}" placeholder="Buscar por código o descripción..." value="${escAttr(textoBusqueda)}" style="flex:1;">
@@ -475,11 +537,11 @@ function renderLista(){
         <button class="filter-btn ${filtroActivo==='pendiente'?'active':''}" data-filtro="pendiente">Pendientes</button>
         <button class="filter-btn ${filtroActivo==='parcial'?'active':''}" data-filtro="parcial">Parciales</button>
         <button class="filter-btn ${filtroActivo==='completo'?'active':''}" data-filtro="completo">Completos</button>
+        <button class="filter-btn ${filtroActivo==='no_llego'?'active':''}" data-filtro="no_llego">No llegó</button>
       </div>
       <div id="resultadosLista">${calcularResultadosLista()}</div>
-      <button class="btn btn-primary btn-block no-print" id="btnReporte">📋 Ver reporte final</button>
-      <button class="btn btn-secondary btn-block no-print" id="btnOrganizar" style="margin-top:8px;">📦 Organizar en paletas</button>
     </div>
+    ${renderBottomNav("lista")}
   `;
 
   document.querySelectorAll("#resultadosLista .product-item").forEach(item=>{
@@ -503,8 +565,12 @@ function renderLista(){
   document.querySelectorAll(".filter-btn").forEach(b=>{
     b.addEventListener("click", ()=>{ filtroActivo = b.dataset.filtro; renderLista(); });
   });
-  document.getElementById("btnReporte").addEventListener("click", irAReporte);
-  document.getElementById("btnOrganizar").addEventListener("click", irAOrganizar);
+}
+
+function contarOrganizar(){
+  const productos = PRODUCTOS_FACTURA.filter(p=> (estado.registros[p.codigo]||[]).length > 0);
+  const asignados = productos.filter(p=> paletasDeProducto(p.codigo).length > 0).length;
+  return { total: productos.length, asignados, faltan: productos.length - asignados };
 }
 
 function calcularResultadosOrganizar(){
@@ -517,7 +583,12 @@ function calcularResultadosOrganizar(){
     );
   }
 
-  productos.sort((a,b)=> a.codigo.localeCompare(b.codigo));
+  productos.sort((a,b)=>{
+    const aAsignado = paletasDeProducto(a.codigo).length > 0 ? 1 : 0;
+    const bAsignado = paletasDeProducto(b.codigo).length > 0 ? 1 : 0;
+    if(aAsignado !== bAsignado) return aAsignado - bAsignado;
+    return a.codigo.localeCompare(b.codigo);
+  });
 
   if(productos.length === 0){
     return `<div class="empty-msg">No se encontraron referencias con bultos registrados.</div>`;
@@ -538,35 +609,62 @@ function calcularResultadosOrganizar(){
           <div class="meta">${esc(p.marca)} · ${regs.length} bulto(s)</div>
         </div>
         ${badge}
+        <input type="text" inputmode="numeric" pattern="[0-9]*" class="inp-paleta-rapida" data-codigo="${escAttr(p.codigo)}" placeholder="P°" value="${paletas.length===1?paletas[0]:""}" style="width:48px; text-align:center; padding:8px 4px; font-size:14px; border-radius:8px; border:1px solid #ccc; flex-shrink:0;">
       </div>
     `;
   }).join("")}</div>`;
+}
+
+function asignarPaletaRapida(codigo, valor){
+  const paleta = valor ? parseInt(valor, 10) : null;
+  const regs = estado.registros[codigo] || [];
+  regs.forEach(r=> r.paleta = (paleta && paleta>=1 && paleta<=10) ? paleta : null);
+  guardarEstado();
+}
+
+function actualizarContadorOrganizar(){
+  const contEl = document.getElementById("contadorOrganizar");
+  if(!contEl) return;
+  const {total, asignados, faltan} = contarOrganizar();
+  contEl.innerHTML = `📦 ${asignados} de ${total} referencias asignadas a una paleta. Faltan ${faltan}.`;
 }
 
 function actualizarResultadosOrganizar(){
   const cont = document.getElementById("resultadosOrganizar");
   if(!cont) return;
   cont.innerHTML = calcularResultadosOrganizar();
-  cont.querySelectorAll(".product-item").forEach(item=>{
-    item.addEventListener("click", ()=> irAOrganizarDetalle(item.dataset.codigo));
+  bindResultadosOrganizar();
+  actualizarContadorOrganizar();
+}
+
+function bindResultadosOrganizar(){
+  document.querySelectorAll("#resultadosOrganizar .product-item .info").forEach(info=>{
+    info.addEventListener("click", ()=> irAOrganizarDetalle(info.closest(".product-item").dataset.codigo));
+  });
+  document.querySelectorAll(".inp-paleta-rapida").forEach(inp=>{
+    inp.addEventListener("change", (e)=>{
+      asignarPaletaRapida(e.target.dataset.codigo, e.target.value.trim());
+      actualizarResultadosOrganizar();
+    });
   });
 }
 
 function renderOrganizar(){
+  const {total, asignados, faltan} = contarOrganizar();
   appEl.innerHTML = `
-    ${renderHeader("Organizar en Paletas", "Busca una referencia y asígnale paleta", true, irALista)}
+    ${renderHeader("Organizar en Paletas", "Busca una referencia y asígnale paleta", true)}
     <div class="container">
+      <div class="empty-msg" id="contadorOrganizar" style="text-align:left; padding:0 0 12px;">📦 ${asignados} de ${total} referencias asignadas a una paleta. Faltan ${faltan}.</div>
       <div class="search-box" style="display:flex; gap:8px; align-items:center;">
         <input type="text" id="buscadorOrganizar" inputmode="text" placeholder="Buscar por código, descripción o marca..." value="${escAttr(textoBusquedaOrganizar)}" style="flex:1;">
       </div>
       <button class="btn btn-secondary btn-block no-print" id="btnVerPaletas" style="margin-bottom:12px;">🗂️ Ver contenido por paleta</button>
       <div id="resultadosOrganizar">${calcularResultadosOrganizar()}</div>
     </div>
+    ${renderBottomNav("organizar")}
   `;
 
-  document.querySelectorAll("#resultadosOrganizar .product-item").forEach(item=>{
-    item.addEventListener("click", ()=> irAOrganizarDetalle(item.dataset.codigo));
-  });
+  bindResultadosOrganizar();
 
   document.getElementById("buscadorOrganizar").addEventListener("input", e=>{
     textoBusquedaOrganizar = e.target.value;
@@ -609,6 +707,7 @@ function renderOrganizarDetalle(){
         }).join("")}
       </div>
     </div>
+    ${renderBottomNav("organizar")}
   `;
 
   document.getElementById("btnBack").addEventListener("click", irAOrganizar);
@@ -670,11 +769,12 @@ function renderOrganizarPaleta(){
         }).join("")}
       </div>
     </div>
+    ${renderBottomNav("organizar")}
   `;
 
   document.getElementById("btnBack").addEventListener("click", irAOrganizar);
   document.querySelectorAll(".filter-btn").forEach(b=>{
-    b.addEventListener("click", ()=>{ paletaSeleccionada = parseInt(b.dataset.paleta, 10); renderOrganizarPaleta(); });
+    b.addEventListener("click", ()=>{ paletaSeleccionada = parseInt(b.dataset.paleta, 10); guardarVista(); renderOrganizarPaleta(); });
   });
   document.querySelectorAll(".product-list .product-item[data-codigo]").forEach(item=>{
     item.addEventListener("click", ()=> irAOrganizarDetalle(item.dataset.codigo));
@@ -689,8 +789,8 @@ function renderDetalle(){
 
   const recibido = unidadesRecibidas(producto.codigo);
   const est = estadoProducto(producto);
-  const labelEstado = est==="completo"?"COMPLETO":est==="parcial"?"PARCIAL":"PENDIENTE";
-  const colorEstado = est==="completo" ? "var(--verde)" : est==="parcial" ? "var(--amarillo)" : "var(--rojo-pend)";
+  const labelEstado = est==="completo"?"COMPLETO":est==="parcial"?"PARCIAL":est==="no_llego"?"NO LLEGÓ":"PENDIENTE";
+  const colorEstado = est==="completo" ? "var(--verde)" : est==="parcial" ? "var(--amarillo)" : est==="no_llego" ? "#9ca3af" : "var(--rojo-pend)";
   const pct = Math.min(100, Math.round((recibido/producto.cantidadEsperada)*100));
 
   const cajas = (estado.registros[producto.codigo]||[]).slice().sort((a,b)=> new Date(b.timestamp)-new Date(a.timestamp));
@@ -733,7 +833,15 @@ function renderDetalle(){
         <div id="formError" class="warn-text" style="display:none;"></div>
         <button class="btn btn-primary btn-block" id="btnRegistrar">✓ Registrar caja</button>
       </div>
+
+      ${(est==="pendiente" || est==="no_llego") ? `
+      <div class="form-card no-print">
+        ${est==="no_llego"
+          ? `<button class="btn btn-secondary btn-block" id="btnNoLlego">↩️ Deshacer "No llegó"</button>`
+          : `<button class="btn btn-secondary btn-block" id="btnNoLlego">🚫 Marcar como "No llegó" (no lo envió el proveedor)</button>`}
+      </div>` : ""}
     </div>
+    ${renderBottomNav("lista")}
   `;
 
   mensajeFlash = null;
@@ -748,6 +856,15 @@ function renderDetalle(){
       renderDetalle();
     });
   });
+
+  const btnNoLlego = document.getElementById("btnNoLlego");
+  if(btnNoLlego){
+    btnNoLlego.addEventListener("click", ()=>{
+      if(est==="no_llego") quitarNoLlego(producto.codigo);
+      else marcarNoLlego(producto.codigo);
+      renderDetalle();
+    });
+  }
 
   document.getElementById("btnRegistrar").addEventListener("click", ()=>{
     const bultoRaw = document.getElementById("inpBulto").value.trim();
@@ -803,7 +920,8 @@ function renderReporte(){
   });
   todasCajas.sort((a,b)=> (a.bulto===null?Infinity:a.bulto) - (b.bulto===null?Infinity:b.bulto));
 
-  const faltantes = PRODUCTOS_FACTURA.filter(p=> unidadesRecibidas(p.codigo) === 0);
+  const faltantes = PRODUCTOS_FACTURA.filter(p=> unidadesRecibidas(p.codigo) === 0 && !estado.noLlegaron[p.codigo]);
+  const noLlegados = PRODUCTOS_FACTURA.filter(p=> estado.noLlegaron[p.codigo]);
   const incompletos = PRODUCTOS_FACTURA.filter(p=>{
     const r = unidadesRecibidas(p.codigo);
     return r > 0 && r < p.cantidadEsperada;
@@ -839,6 +957,9 @@ function renderReporte(){
       return `<div class="item-line">• ${esc(p.codigo)} — ${esc(p.descripcion)}: ${r}/${p.cantidadEsperada} (excedente ${r-p.cantidadEsperada})</div>`;
     }).join("")}</div>`;
 
+  const noLlegadosHtml = noLlegados.length===0 ? `<div class="empty-msg">Ninguno</div>` :
+    `<div class="report-list">${noLlegados.map(p=>`<div class="item-line">• ${esc(p.codigo)} — ${esc(p.descripcion)}: 0/${p.cantidadEsperada}</div>`).join("")}</div>`;
+
   appEl.innerHTML = `
     ${renderHeader("Reporte final", null, true)}
     <div class="container">
@@ -858,6 +979,9 @@ function renderReporte(){
 
       <div class="section-title">📈 Excedentes</div>
       ${excedentesHtml}
+
+      <div class="section-title">🚫 No enviados por el proveedor</div>
+      ${noLlegadosHtml}
 
       <button class="btn btn-secondary btn-block no-print" id="btnCopiar">📋 Copiar reporte para WhatsApp</button>
       <button class="btn btn-primary btn-block no-print" id="btnPdf">🖨️ Guardar como PDF</button>
@@ -885,6 +1009,7 @@ function renderReporte(){
       <input type="file" id="inputImportar" accept="application/json,.json" style="display:none;">
       <div id="importarMsg" class="confirm-flash" style="display:none;"></div>
     </div>
+    ${renderBottomNav("reporte")}
   `;
 
   document.getElementById("btnBack").addEventListener("click", irALista);
@@ -1006,6 +1131,16 @@ function esc(str){
   return String(str).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
 }
 function escAttr(str){ return esc(str); }
+
+appEl.addEventListener("click", (e)=>{
+  const navBtn = e.target.closest(".bottom-nav button");
+  if(!navBtn) return;
+  const destino = navBtn.dataset.nav;
+  if(destino === "lista") irALista();
+  else if(destino === "organizar") irAOrganizar();
+  else if(destino === "reporte") irAReporte();
+  else if(destino === "exportar") exportarDatos();
+});
 
 render();
 </script>
