@@ -627,6 +627,13 @@ function asignarPaletaRapida(codigo, valor){
   guardarEstado();
 }
 
+function reiniciarPaletas(){
+  Object.values(estado.registros).forEach(regs=>{
+    regs.forEach(r=> r.paleta = null);
+  });
+  guardarEstado();
+}
+
 function actualizarContadorOrganizar(){
   const contEl = document.getElementById("contadorOrganizar");
   if(!contEl) return;
@@ -670,7 +677,8 @@ function renderOrganizar(){
       <div class="search-box" style="display:flex; gap:8px; align-items:center;">
         <input type="text" id="buscadorOrganizar" inputmode="text" placeholder="Buscar por código, descripción o marca..." value="${escAttr(textoBusquedaOrganizar)}" style="flex:1;">
       </div>
-      <button class="btn btn-secondary btn-block no-print" id="btnVerPaletas" style="margin-bottom:12px;">🗂️ Ver contenido por paleta</button>
+      <button class="btn btn-secondary btn-block no-print" id="btnVerPaletas" style="margin-bottom:8px;">🗂️ Ver contenido por paleta</button>
+      <button class="btn btn-secondary btn-block no-print" id="btnReiniciarPaletas" style="margin-bottom:12px; color:var(--rojo); border-color:var(--rojo);">🔄 Reiniciar asignación de paletas</button>
       <div id="resultadosOrganizar">${calcularResultadosOrganizar()}</div>
     </div>
     ${renderBottomNav("organizar")}
@@ -690,6 +698,12 @@ function renderOrganizar(){
   });
 
   document.getElementById("btnVerPaletas").addEventListener("click", irAOrganizarPaleta);
+  document.getElementById("btnReiniciarPaletas").addEventListener("click", ()=>{
+    if(confirm("¿Seguro que quieres quitar la asignación de paleta de TODAS las referencias? Los bultos recibidos no se borran, solo el número de paleta.")){
+      reiniciarPaletas();
+      actualizarResultadosOrganizar();
+    }
+  });
   document.getElementById("btnBack").addEventListener("click", irALista);
 }
 
