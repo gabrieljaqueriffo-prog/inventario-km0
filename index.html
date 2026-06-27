@@ -389,10 +389,11 @@ let filtroActivo = "todos";
 let textoBusqueda = "";
 let tecladoBuscadorNumerico = true;
 let textoBusquedaOrganizar = "";
+let categoriaFiltroOrganizar = (vistaGuardada && vistaGuardada.categoriaFiltroOrganizar) || "todas";
 let paletaSeleccionada = (vistaGuardada && vistaGuardada.paletaSeleccionada) || 1;
 
 function guardarVista(){
-  localStorage.setItem(VISTA_KEY, JSON.stringify({ vista, productoActual, paletaSeleccionada }));
+  localStorage.setItem(VISTA_KEY, JSON.stringify({ vista, productoActual, paletaSeleccionada, categoriaFiltroOrganizar }));
 }
 
 function irALista(){ vista="lista"; productoActual=null; guardarVista(); render(); }
@@ -576,6 +577,10 @@ function contarOrganizar(){
 function calcularResultadosOrganizar(){
   let productos = PRODUCTOS_FACTURA.filter(p=> (estado.registros[p.codigo]||[]).length > 0);
 
+  if(categoriaFiltroOrganizar !== "todas"){
+    productos = productos.filter(p=> p.categoria === categoriaFiltroOrganizar);
+  }
+
   if(textoBusquedaOrganizar.trim()){
     const q = normalizar(textoBusquedaOrganizar);
     productos = productos.filter(p =>
@@ -651,10 +656,17 @@ function bindResultadosOrganizar(){
 
 function renderOrganizar(){
   const {total, asignados, faltan} = contarOrganizar();
+  const categoriasUnicas = [...new Set(PRODUCTOS_FACTURA.map(p=>p.categoria))].sort();
   appEl.innerHTML = `
     ${renderHeader("Organizar en Paletas", "Busca una referencia y asígnale paleta", true)}
     <div class="container">
       <div class="empty-msg" id="contadorOrganizar" style="text-align:left; padding:0 0 12px;">📦 ${asignados} de ${total} referencias asignadas a una paleta. Faltan ${faltan}.</div>
+      <div class="search-box">
+        <select id="selCategoriaOrganizar" style="width:100%; height:48px; padding:0 12px; font-size:15px; border-radius:8px; border:1px solid #d4d4d8; background:var(--blanco); color:var(--gris);">
+          <option value="todas" ${categoriaFiltroOrganizar==='todas'?'selected':''}>Todas las categorías</option>
+          ${categoriasUnicas.map(c=>`<option value="${escAttr(c)}" ${categoriaFiltroOrganizar===c?'selected':''}>${esc(c)}</option>`).join("")}
+        </select>
+      </div>
       <div class="search-box" style="display:flex; gap:8px; align-items:center;">
         <input type="text" id="buscadorOrganizar" inputmode="text" placeholder="Buscar por código, descripción o marca..." value="${escAttr(textoBusquedaOrganizar)}" style="flex:1;">
       </div>
@@ -668,6 +680,12 @@ function renderOrganizar(){
 
   document.getElementById("buscadorOrganizar").addEventListener("input", e=>{
     textoBusquedaOrganizar = e.target.value;
+    actualizarResultadosOrganizar();
+  });
+
+  document.getElementById("selCategoriaOrganizar").addEventListener("change", e=>{
+    categoriaFiltroOrganizar = e.target.value;
+    guardarVista();
     actualizarResultadosOrganizar();
   });
 
