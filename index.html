@@ -713,6 +713,8 @@ function renderReporte(){
     setTimeout(()=>{ msg.style.display = "none"; }, 2000);
   });
 
+  document.getElementById("btnExportar").addEventListener("click", exportarDatos);
+
   document.getElementById("btnCompletarCategoria").addEventListener("click", ()=>{
     const categoria = document.getElementById("selCategoriaCompletar").value;
     const productosCategoria = PRODUCTOS_FACTURA.filter(p=> p.categoria === categoria);
